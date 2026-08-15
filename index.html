@@ -1,0 +1,3348 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Batalha de Heróis - Protótipo</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; background: #111;
+    height: 100vh; height: 100dvh;
+    width: 100vw;
+    font-family: Arial, sans-serif; overflow: hidden;
+  }
+  #gameWrap {
+    position: relative;
+    width: 100vw; height: 100vh; height: 100dvh;
+    overflow: hidden;
+    background: #000;
+  }
+  #gameWrap:fullscreen {
+    width: 100vw; height: 100vh;
+  }
+  #rotateOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #0d1219;
+    color: #fff;
+    z-index: 99999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  #rotateOverlay .icon {
+    font-size: 56px;
+    margin-bottom: 16px;
+    animation: rotateHint 1.6s ease-in-out infinite;
+  }
+  #rotateOverlay h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+  }
+  #rotateOverlay p {
+    margin: 0;
+    color: #9fb3c8;
+    font-size: 14px;
+  }
+  @keyframes rotateHint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+  }
+  @media (orientation: portrait) and (max-aspect-ratio: 1/1) {
+    #rotateOverlay { display: flex; }
+    #gameWrap { display: none; }
+  }
+  #innerStage {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 960px;
+    height: 540px;
+    transform-origin: center center;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  }
+  #gameContent, #startScreen {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+  canvas {
+    display: block;
+    background: #2a3a4a;
+    width: 100%;
+    height: 100%;
+  }
+
+  #ui {
+    position: absolute; bottom: 0; left: 0; width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.5));
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  #energyBarOuter {
+    width: 100%; height: 16px;
+    background: #222; border: 2px solid #555; border-radius: 8px;
+    overflow: hidden;
+  }
+  #energyBarInner {
+    height: 100%; width: 0%;
+    background: linear-gradient(to right, #2ecbff, #1976d2);
+    transition: width 0.1s linear;
+  }
+  #energyLabel {
+    color: #fff; font-size: 12px; text-align: right; margin-top: -4px;
+  }
+
+  /* ---------- Área de cartas ---------- */
+  #cardArea {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  /* --- Mão: 4 cartas grandes --- */
+  #hand {
+    display: flex; gap: 8px;
+  }
+  .card {
+    width: 100px; height: 86px;
+    border-radius: 10px;
+    border: 2px solid #444;
+    background: #333;
+    color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s, filter 0.1s, box-shadow 0.15s;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .card:hover { transform: translateY(-6px); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+  .card .name { font-weight: bold; font-size: 13px; margin-bottom: 3px; }
+  .card .cost {
+    position: absolute; top: 4px; right: 5px;
+    background: #1976d2; border-radius: 50%;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: bold;
+  }
+  .card .icon { font-size: 26px; }
+  .card.disabled {
+    filter: grayscale(0.8) brightness(0.55);
+    cursor: not-allowed;
+  }
+  .card.disabled:hover { transform: none; box-shadow: none; }
+  .card.selected {
+    border-color: #ffd23f;
+    box-shadow: 0 0 0 3px rgba(255,210,63,0.5), 0 6px 18px rgba(0,0,0,0.5);
+    transform: translateY(-6px);
+  }
+  #game.placing { cursor: crosshair; }
+  #placementHint {
+    position: absolute;
+    top: 8px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.65);
+    color: #ffd23f;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 5px 12px;
+    border-radius: 8px;
+    pointer-events: none;
+    display: none;
+  }
+
+  /* --- Separador --- */
+  #queueSep {
+    width: 2px; height: 70px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* --- Fila: cartas aguardando --- */
+  #queue {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .qcard {
+    width: 52px; height: 60px;
+    border-radius: 8px;
+    border: 2px solid #2a2a2a;
+    background: #191919;
+    color: #555;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    user-select: none;
+    flex-shrink: 0;
+    opacity: 0.45;
+    position: relative;
+    filter: grayscale(1) brightness(0.6);
+  }
+  .qcard .icon { font-size: 18px; }
+  .qcard .cost {
+    position: absolute; top: 2px; right: 3px;
+    background: #2a2a2a; border-radius: 50%;
+    width: 15px; height: 15px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: bold; color: #666;
+  }
+  #queueWrapper { display: flex; align-items: center; }
+
+  /* Cores de borda por tipo */
+  .warrior { border-color: #e74c3c; }
+  .archer  { border-color: #2ecc71; }
+  .mage    { border-color: #3498db; }
+  .witch   { border-color: #9b59b6; }
+  .zombie  { border-color: #6b8f3a; }
+  .guard   { border-color: #c8a43a; }
+  .healer  { border-color: #f1c40f; }
+  .knight  { border-color: #ecf0f1; }
+  .paladin { border-color: #f39c12; }
+  .sorceress { border-color: #d35400; }
+
+  /* ---------- Tela Inicial ---------- */
+  #startScreen {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle at 50% 30%, #2a3a4a, #0d1219 80%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 10;
+    color: #fff;
+  }
+  #startScreen h1 {
+    font-size: 42px;
+    margin: 0 0 8px 0;
+    letter-spacing: 2px;
+    text-shadow: 0 0 12px rgba(46,203,255,0.6);
+  }
+  #startScreen p.subtitle {
+    margin: 0 0 36px 0;
+    color: #9fb3c8;
+    font-size: 14px;
+  }
+  .menuBtn {
+    width: 220px;
+    padding: 14px 0;
+    margin-bottom: 14px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+    border: 2px solid #444;
+    border-radius: 10px;
+    background: #1e2a36;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.15s;
+  }
+  .menuBtn:hover {
+    transform: translateY(-2px);
+    background: #28384a;
+  }
+  #startBtn {
+    border-color: #2ecbff;
+    background: linear-gradient(to right, #1976d2, #2ecbff);
+  }
+  #startBtn:hover {
+    filter: brightness(1.1);
+  }
+  .phaseShortcuts {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 14px;
+    gap: 8px;
+  }
+  .phaseShortcutsLabel {
+    font-size: 12px;
+    color: #6a8aa0;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .phaseShortcutsBtns {
+    display: flex;
+    gap: 8px;
+  }
+  .phaseBtn {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #ccc;
+    background: #1a2530;
+    border: 1px solid #3a4a5a;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .phaseBtn:hover {
+    background: #243040;
+    color: #fff;
+    border-color: #f39c12;
+  }
+  .phaseBtn[data-phase="2"] { border-color: #27ae60; }
+  .phaseBtn[data-phase="2"]:hover { background: #1a3a28; border-color: #2ecc71; }
+  .phaseBtn[data-phase="3"] { border-color: #2980b9; }
+  .phaseBtn[data-phase="3"]:hover { background: #1a2a3a; border-color: #3498db; }
+  .phaseBtn[data-phase="4"] { border-color: #8e44ad; }
+  .phaseBtn[data-phase="4"]:hover { background: #2a1a3a; border-color: #9b59b6; }
+  .phaseBtn[data-phase="5"] { border-color: #c0392b; }
+  .phaseBtn[data-phase="5"]:hover { background: #3a1a1a; border-color: #e74c3c; }
+  #fullscreenBtn {
+    border-color: #888;
+  }
+  #heroesBtn {
+    border-color: #9b59b6;
+  }
+  #gameContent { display: none; }
+
+  /* ---------- Tela de Seleção de Heróis ---------- */
+  #heroesScreen {
+    display: none;
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle at 50% 20%, #2a3a4a, #0d1219 80%);
+    flex-direction: column; align-items: center;
+    z-index: 15;
+    color: #fff;
+    box-sizing: border-box;
+    padding: 16px 20px;
+  }
+  #heroesScreen h1 {
+    font-size: 24px;
+    margin: 0 0 4px 0;
+    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(155,89,182,0.6);
+  }
+  #heroesScreen .sectionLabel {
+    align-self: flex-start;
+    font-size: 12px;
+    color: #9fb3c8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 10px 2px 6px 2px;
+  }
+  #heroesHint {
+    min-height: 16px;
+    font-size: 12px;
+    color: #2ecbff;
+    font-weight: bold;
+    margin-top: 4px;
+  }
+  #heroesScroll {
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #selectedHeroesGrid, #otherHeroesGrid {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+  }
+  .heroCardBig {
+    width: 92px; height: 110px;
+    border-radius: 12px;
+    border: 2px solid #444;
+    background: #1c2530;
+    color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
+  }
+  .heroCardBig:hover { transform: translateY(-4px); }
+  .heroCardBig .icon { font-size: 34px; }
+  .heroCardBig .name { font-size: 12px; font-weight: bold; margin-top: 6px; text-align: center; padding: 0 4px; }
+  .heroCardBig .cost {
+    position: absolute; top: 5px; right: 6px;
+    background: #1976d2; border-radius: 50%;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: bold;
+  }
+  .heroCardBig.inTeam {
+    border-color: #ffd23f;
+    box-shadow: 0 0 0 2px rgba(255,210,63,0.4);
+  }
+  .heroCardBig.inTeam.pickable {
+    cursor: pointer;
+    animation: pulsePick 1s infinite;
+  }
+  @keyframes pulsePick {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(46,203,255,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(46,203,255,0.8); }
+  }
+  .heroCardBig.empty {
+    border-style: dashed;
+    border-color: #3a4856;
+    background: rgba(255,255,255,0.02);
+    color: #4a5a6a;
+  }
+  .heroCardBig.empty .icon { font-size: 26px; opacity: 0.5; }
+  .heroCardBig.selectedForChoice {
+    border-color: #2ecbff;
+    box-shadow: 0 0 0 3px rgba(46,203,255,0.5);
+    transform: translateY(-4px);
+  }
+  .chooseBtn {
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(to right, #1976d2, #2ecbff);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    z-index: 2;
+  }
+  .chooseBtn:hover { filter: brightness(1.1); }
+  #heroesBackBtn {
+    margin-top: 14px;
+    width: 180px;
+    flex-shrink: 0;
+  }
+
+  /* ---------- Tela de Game Over ---------- */
+  #gameOverScreen {
+    display: none;
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle at 50% 40%, #3a0a0a, #0d0505 80%);
+    flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20;
+    color: #fff;
+  }
+  #gameOverScreen h1 {
+    font-size: 52px;
+    margin: 0 0 10px 0;
+    letter-spacing: 3px;
+    color: #e74c3c;
+    text-shadow: 0 0 20px rgba(231,76,60,0.7);
+  }
+  #gameOverScreen p {
+    margin: 0 0 40px 0;
+    color: #c0807a;
+    font-size: 15px;
+  }
+  #restartBtn {
+    border-color: #e74c3c;
+    background: linear-gradient(to right, #7f1d1d, #e74c3c);
+  }
+  #restartBtn:hover { filter: brightness(1.1); }
+</style>
+</head>
+<body>
+
+<div id="rotateOverlay">
+  <div class="icon">📱</div>
+  <h2>Gire seu celular</h2>
+  <p>Este jogo funciona melhor na horizontal. Vire o aparelho para jogar.</p>
+</div>
+
+<div id="gameWrap">
+<div id="innerStage">
+  <div id="gameOverScreen">
+    <h1>💀 DERROTA</h1>
+    <p>O gigante destruiu seu castelo!</p>
+    <button id="restartBtn" class="menuBtn">↺ Tentar Novamente</button>
+    <button id="menuBtn2" class="menuBtn">🏠 Voltar ao Menu</button>
+  </div>
+
+  <div id="startScreen">
+    <h1>⚔️ Batalha de Heróis</h1>
+    <p class="subtitle">Convoque heróis e derrote o inimigo gigante</p>
+    <button id="startBtn" class="menuBtn">▶ Iniciar</button>
+    <div class="phaseShortcuts">
+      <span class="phaseShortcutsLabel">Atalhos de fase:</span>
+      <div class="phaseShortcutsBtns">
+        <button class="phaseBtn" data-phase="2">Fase 2</button>
+        <button class="phaseBtn" data-phase="3">Fase 3</button>
+        <button class="phaseBtn" data-phase="4">Fase 4</button>
+        <button class="phaseBtn" data-phase="5">Fase 5</button>
+      </div>
+    </div>
+    <button id="heroesBtn" class="menuBtn">🃏 Heróis</button>
+    <button id="fullscreenBtn" class="menuBtn">⛶ Tela Cheia</button>
+  </div>
+
+  <div id="heroesScreen">
+    <h1>🃏 Heróis</h1>
+    <div id="heroesHint"></div>
+    <div id="heroesScroll">
+      <div class="sectionLabel">Escolhidos para batalha</div>
+      <div id="selectedHeroesGrid"></div>
+      <div class="sectionLabel">Outras cartas</div>
+      <div id="otherHeroesGrid"></div>
+    </div>
+    <button id="heroesBackBtn" class="menuBtn">◀ Voltar</button>
+  </div>
+
+  <div id="gameContent">
+  <canvas id="game" width="960" height="540"></canvas>
+  <div id="placementHint">Toque no campo para posicionar</div>
+  <div id="ui">
+    <div id="energyBarOuter"><div id="energyBarInner"></div></div>
+    <div id="energyLabel">Energia: 0 / 10</div>
+    <div id="cardArea">
+      <div id="hand"></div>
+      <div id="queueSep"></div>
+      <div id="queueWrapper">
+        <div id="queue"></div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ---------- Responsividade: escala o innerStage mantendo proporção 960x540 ----------
+const BASE_W = 960, BASE_H = 540;
+const innerStage = document.getElementById('innerStage');
+
+function resizeGame() {
+  const availW = window.innerWidth;
+  const availH = window.innerHeight;
+  const scale = Math.min(availW / BASE_W, availH / BASE_H);
+  innerStage.style.transform = `translate(-50%, -50%) scale(${scale})`;
+}
+
+window.addEventListener('resize', resizeGame);
+window.addEventListener('orientationchange', resizeGame);
+document.addEventListener('fullscreenchange', resizeGame);
+resizeGame();
+
+// ---------- Tela Inicial ----------
+const startScreen = document.getElementById('startScreen');
+const gameContent = document.getElementById('gameContent');
+const startBtn = document.getElementById('startBtn');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const gameWrap = document.getElementById('gameWrap');
+
+startBtn.addEventListener('click', () => {
+  startScreen.style.display = 'none';
+  gameContent.style.display = 'block';
+  // Reseta todo o estado do jogo antes de iniciar
+  heroes = [];
+  enemies = [];
+  projectiles = [];
+  rockBursts = [];
+  energy = 4;
+  enemyDeadSince = null;
+  phase = 1;
+  wave = 0;
+  spawnQueue = [];
+  phaseBannerText = null;
+  gameOver = false;
+  selectedHandIndex = null;
+  tripleComboActive = false;
+  tripleComboUsedInPhase = false;
+  tripleComboHeroes = [];
+  tripleComboBeamTargets = [];
+  tripleComboBannerUntil = 0;
+  canvas.classList.remove('placing');
+  placementHint.style.display = 'none';
+  resetPhase1State();
+  initHand(); // monta mão/fila com o time atual (PLAYABLE_TYPES), incluindo trocas feitas no menu Heróis
+  startNextWave(performance.now());
+  lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+});
+
+// Atalhos de fase
+document.querySelectorAll('.phaseBtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const targetPhase = parseInt(btn.dataset.phase);
+    startScreen.style.display = 'none';
+    gameContent.style.display = 'block';
+    initHand();
+    phase = targetPhase;
+    wave = 0;
+    enemies = [];
+    spawnQueue = [];
+    enemyDeadSince = null;
+    energy = 4;
+    tripleComboUsedInPhase = false;
+    tripleComboActive = false;
+    startNextWave(performance.now());
+    showPhaseBanner(phase);
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+  });
+});
+
+const heroesScreen = document.getElementById('heroesScreen');
+const heroesBtn = document.getElementById('heroesBtn');
+const heroesBackBtn = document.getElementById('heroesBackBtn');
+
+heroesBtn.addEventListener('click', () => {
+  startScreen.style.display = 'none';
+  heroesScreen.style.display = 'flex';
+  renderHeroesScreen();
+});
+
+heroesBackBtn.addEventListener('click', () => {
+  heroesScreen.style.display = 'none';
+  startScreen.style.display = 'flex';
+});
+
+fullscreenBtn.addEventListener('click', () => {
+  if (gameWrap.requestFullscreen) {
+    gameWrap.requestFullscreen();
+  } else if (gameWrap.webkitRequestFullscreen) {
+    gameWrap.webkitRequestFullscreen();
+  } else if (gameWrap.msRequestFullscreen) {
+    gameWrap.msRequestFullscreen();
+  }
+});
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const GROUND_Y = H - 160; // linha do "chão" onde personagens ficam
+
+const BG_IMG = new Image();
+BG_IMG.src = 'https://i.imgur.com/NI1Gr4c.jpeg';
+
+
+// ---------- Sprites do Guerreiro (geradas a partir das sprite sheets enviadas) ----------
+const WARRIOR_FRAME_W = 90, WARRIOR_FRAME_H = 95;
+const WARRIOR_FRAME_COUNTS = { idle: 3, walk: 6, attack: 9, hit: 1 };
+const WARRIOR_FRAME_DURATIONS = { idle: 0.28, walk: 0.09, attack: 0.8/9, hit: 0.15 };
+const WARRIOR_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/warrior_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'https://i.ibb.co/RTX3SCNN/warrior-walk-spritesheet.png';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/warrior_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/warrior_hit.webp';
+  }
+};
+WARRIOR_SPRITES.loadAll();
+
+
+
+const ARCHER_FRAME_W = 48, ARCHER_FRAME_H = 54;
+const ARCHER_FRAME_COUNTS = { idle: 7, walk: 6, attack: 9, hit: 6 };
+const ARCHER_FRAME_DURATIONS = { idle: 0.24, walk: 0.09, attack: 0.667/9, hit: 0.08 };
+const ARCHER_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/archer_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/archer_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/archer_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/archer_hit.webp';
+  }
+};
+ARCHER_SPRITES.loadAll();
+
+
+
+
+const ORC_FRAME_W = 236, ORC_FRAME_H = 234;
+const ORC_FRAME_COUNTS = { walk: 6, victory: 5, defeat: 8 };
+const ORC_FRAME_DURATIONS = { walk: 0.1, victory: 0.28, defeat: 0.11 };
+const ORC_SPRITES = {
+  loadAll() {
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/orc_walk.webp';
+    this['victory'] = new Image();
+    this['victory'].src = 'sprites/orc_victory.webp';
+    this['defeat'] = new Image();
+    this['defeat'].src = 'sprites/orc_defeat.webp';
+  }
+};
+ORC_SPRITES.loadAll();
+
+
+
+
+const WITCH_FRAME_W = 110, WITCH_FRAME_H = 110;
+const WITCH_FRAME_COUNTS = { idle: 1, walk: 7, attack: 4, hit: 4 };
+const WITCH_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.25, hit: 0.12 };
+const WITCH_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/witch_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/witch_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/witch_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/witch_hit.webp';
+  }
+};
+WITCH_SPRITES.loadAll();
+
+
+
+
+const MAGE_FRAME_W = 110, MAGE_FRAME_H = 110;
+const MAGE_FRAME_COUNTS = { idle: 1, walk: 7, attack: 4, hit: 2 };
+const MAGE_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.18, hit: 0.18 };
+const MAGE_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/mage_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/mage_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/mage_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/mage_hit.webp';
+  }
+};
+MAGE_SPRITES.loadAll();
+
+
+
+
+const GUARD_FRAME_W = 110, GUARD_FRAME_H = 110;
+const GUARD_FRAME_COUNTS = { idle: 1, walk: 6, attack: 3, hit: 3 };
+const GUARD_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.18, hit: 0.13 };
+const GUARD_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/guard_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/guard_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/guard_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/guard_hit.webp';
+  }
+};
+GUARD_SPRITES.loadAll();
+
+
+
+const HEALER_FRAME_W = 90, HEALER_FRAME_H = 95;
+const HEALER_FRAME_COUNTS = { idle: 1, walk: 2, attack: 1, hit: 4 };
+const HEALER_FRAME_DURATIONS = { idle: 0.4, walk: 0.22, attack: 0.5, hit: 0.13 };
+const HEALER_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/healer_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/healer_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/healer_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/healer_hit.webp';
+  }
+};
+HEALER_SPRITES.loadAll();
+
+
+
+const DRUID_FRAME_W = 90, DRUID_FRAME_H = 95;
+const DRUID_FRAME_COUNTS = { idle: 1, walk: 7, attack: 3, hit: 2 };
+const DRUID_FRAME_DURATIONS = { idle: 0.35, walk: 0.1, attack: 0.22, hit: 0.18 };
+const DRUID_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/druid_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/druid_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/druid_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/druid_hit.webp';
+  }
+};
+DRUID_SPRITES.loadAll();
+
+
+
+const ZOMBIE_FRAME_W = 60, ZOMBIE_FRAME_H = 64;
+const ZOMBIE_FRAME_COUNTS = { idle: 1, walk: 36, attack: 4, hit: 1 };
+const ZOMBIE_FRAME_DURATIONS = { idle: 0.4, walk: 0.11, attack: 0.15, hit: 0.2 };
+const ZOMBIE_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/zombie_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/zombie_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/zombie_attack.webp';
+  }
+};
+ZOMBIE_SPRITES.loadAll();
+
+
+
+
+const SORCERESS_FRAME_W = 110, SORCERESS_FRAME_H = 110;
+const SORCERESS_FRAME_COUNTS = { idle: 1, walk: 3, attack: 4, hit: 1 };
+const SORCERESS_FRAME_DURATIONS = { idle: 0.3, walk: 0.12, attack: 0.18, hit: 0.12 };
+const SORCERESS_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/sorceress_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/sorceress_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/sorceress_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/sorceress_hit.webp';
+  }
+};
+SORCERESS_SPRITES.loadAll();
+
+
+
+const PALADIN_FRAME_W = 329, PALADIN_FRAME_H = 300;
+const PALADIN_FRAME_COUNTS = { idle: 1, walk: 3, attack: 3, hit: 2 };
+const PALADIN_FRAME_DURATIONS = { idle: 0.3, walk: 0.12, attack: 0.18, hit: 0.18 };
+const PALADIN_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/paladin_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/paladin_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/paladin_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/paladin_hit.webp';
+  }
+};
+PALADIN_SPRITES.loadAll();
+
+
+
+
+
+// ---------- Sprites do Gigante de Pedra ----------
+// walk: 23011 → 4 frames, 810×308 → frameW=202, frameH=308
+const GIANT_FRAME_W = 202, GIANT_FRAME_H = 308;
+const GIANT_FRAME_COUNTS    = { walk: 4 };
+const GIANT_FRAME_DURATIONS = { walk: 0.22 };  // lento, passo pesado
+const GIANT_SPRITES = {
+  loadAll() {
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/giant_walk.webp';
+  }
+};
+GIANT_SPRITES.loadAll();
+
+
+
+
+// ---------- Sprites do Cavaleiro ----------
+// idle:   frame0 de 22665 → 1 frame, 268×232
+// walk:   22665 → 4 frames, 1074×232 → frameW=268
+// attack: 22667 → 4 frames, 1019×245 → frameW=254
+// hit:    22669 → 3 frames, 907×275  → frameW=302
+const KNIGHT_FRAME_W = 268, KNIGHT_FRAME_H = 232;
+const KNIGHT_FRAME_COUNTS    = { idle: 1, walk: 4, attack: 4, hit: 3 };
+const KNIGHT_FRAME_DURATIONS = { idle: 0.4, walk: 0.1, attack: 0.15, hit: 0.13 };
+const KNIGHT_SPRITES = {
+  loadAll() {
+    this['idle'] = new Image();
+    this['idle'].src = 'sprites/knight_idle.webp';
+    this['walk'] = new Image();
+    this['walk'].src = 'sprites/knight_walk.webp';
+    this['attack'] = new Image();
+    this['attack'].src = 'sprites/knight_attack.webp';
+    this['hit'] = new Image();
+    this['hit'].src = 'sprites/knight_hit.webp';
+  }
+};
+KNIGHT_SPRITES.loadAll();
+
+
+
+
+// ---------- Sprites do Dragão ----------
+// 5 frames de voo (asas: alto→abertas→horizontal→abaixadas→fechadas)
+// Sheet: 2500×600, frameW=500, frameH=600
+const DRAGON_FRAME_W = 500, DRAGON_FRAME_H = 600;
+const DRAGON_FRAME_COUNT = 5;
+const DRAGON_FRAME_DUR = 0.13; // segundos por frame
+const DRAGON_SPRITE_IMG = new Image();
+DRAGON_SPRITE_IMG.src = 'sprites/dragon.webp';
+
+
+// ---------- Sprites do Ceifador de Almas ----------
+// idle:   4 frames, 520×130  → frameW=130
+// walk:   5 frames, 650×130  → frameW=130
+// attack: 3 frames, 390×130  → frameW=130
+// hit:    2 frames, 260×130  → frameW=130
+// death:  3 frames, 540×100  → frameW=180
+const REAPER_FW = 130, REAPER_FH = 130;
+const REAPER_FW_DEATH = 180, REAPER_FH_DEATH = 100;
+const REAPER_COUNTS    = { idle: 4, walk: 5, attack: 3, hit: 2, death: 3 };
+const REAPER_DURATIONS = { idle: 0.25, walk: 0.12, attack: 0.16, hit: 0.14, death: 0.22 };
+const REAPER_URLS = {
+  idle: 'COLE_AQUI_URL_REAPER_IDLE',
+  walk: 'COLE_AQUI_URL_REAPER_WALK',
+  attack: 'COLE_AQUI_URL_REAPER_ATTACK',
+  hit: 'COLE_AQUI_URL_REAPER_HIT',
+  death: 'COLE_AQUI_URL_REAPER_DEATH'
+};
+const REAPER_SPRITES = {};
+Object.keys(REAPER_URLS).forEach(name => {
+  const img = new Image();
+  img.src = REAPER_URLS[name];
+  REAPER_SPRITES[name] = img;
+});
+
+// ---------- Sprites da Rainha Vermelha (imagens completas, sem spritesheet) ----------
+const RQ_URLS = {
+  idle1: 'COLE_AQUI_URL_RQ_IDLE1',
+  idle2: 'COLE_AQUI_URL_RQ_IDLE2',
+  idle3: 'COLE_AQUI_URL_RQ_IDLE3',
+  idle4: 'COLE_AQUI_URL_RQ_IDLE4',
+  idle5: 'COLE_AQUI_URL_RQ_IDLE5',
+  idle6: 'COLE_AQUI_URL_RQ_IDLE6',
+  summon1: 'COLE_AQUI_URL_RQ_SUMMON1',
+  summon2: 'COLE_AQUI_URL_RQ_SUMMON2',
+  summon3: 'COLE_AQUI_URL_RQ_SUMMON3',
+  attack1: 'COLE_AQUI_URL_RQ_ATTACK1',
+  attack2: 'COLE_AQUI_URL_RQ_ATTACK2',
+  attack3: 'COLE_AQUI_URL_RQ_ATTACK3',
+  death1: 'COLE_AQUI_URL_RQ_DEATH1',
+  death2: 'COLE_AQUI_URL_RQ_DEATH2'
+};
+
+const RQ_SPRITES = {};
+Object.keys(RQ_URLS).forEach(name => {
+  const img = new Image();
+  img.src = RQ_URLS[name];
+  RQ_SPRITES[name] = img;
+});
+// Agrupamento por estado de animação
+const RQ_FRAMES = {
+  idle:   ['idle1', 'idle2', 'idle3', 'idle4', 'idle5', 'idle6'],
+  walk:   ['idle1', 'idle2', 'idle3', 'idle4', 'idle5', 'idle6'],
+  summon: ['summon1', 'summon2', 'summon3'],
+  attack: ['attack1', 'attack2', 'attack3'],
+  death:  ['death1', 'death2']
+};
+const RQ_DURATIONS = { idle: 0.32, walk: 0.32, summon: 0.18, attack: 0.12, death: 0.35 };
+
+// Registro genérico de sprites por tipo de herói (facilita adicionar outros heróis depois)
+const SPRITE_CONFIGS = {
+  warrior: { sprites: WARRIOR_SPRITES, frameW: WARRIOR_FRAME_W, frameH: WARRIOR_FRAME_H, counts: WARRIOR_FRAME_COUNTS, durations: WARRIOR_FRAME_DURATIONS },
+  archer:  { sprites: ARCHER_SPRITES,  frameW: ARCHER_FRAME_W,  frameH: ARCHER_FRAME_H,  counts: ARCHER_FRAME_COUNTS,  durations: ARCHER_FRAME_DURATIONS },
+  witch:   { sprites: WITCH_SPRITES,   frameW: WITCH_FRAME_W,   frameH: WITCH_FRAME_H,   counts: WITCH_FRAME_COUNTS,   durations: WITCH_FRAME_DURATIONS },
+  mage:    { sprites: MAGE_SPRITES,    frameW: MAGE_FRAME_W,    frameH: MAGE_FRAME_H,    counts: MAGE_FRAME_COUNTS,    durations: MAGE_FRAME_DURATIONS },
+  guard:   { sprites: GUARD_SPRITES,   frameW: GUARD_FRAME_W,   frameH: GUARD_FRAME_H,   counts: GUARD_FRAME_COUNTS,   durations: GUARD_FRAME_DURATIONS },
+  healer:  { sprites: HEALER_SPRITES,  frameW: HEALER_FRAME_W,  frameH: HEALER_FRAME_H,  counts: HEALER_FRAME_COUNTS,  durations: HEALER_FRAME_DURATIONS },
+  druid:   { sprites: DRUID_SPRITES,   frameW: DRUID_FRAME_W,   frameH: DRUID_FRAME_H,   counts: DRUID_FRAME_COUNTS,   durations: DRUID_FRAME_DURATIONS },
+  zombie:  { sprites: ZOMBIE_SPRITES,  frameW: ZOMBIE_FRAME_W,  frameH: ZOMBIE_FRAME_H,  counts: ZOMBIE_FRAME_COUNTS,  durations: ZOMBIE_FRAME_DURATIONS },
+  sorceress: { sprites: SORCERESS_SPRITES, frameW: SORCERESS_FRAME_W, frameH: SORCERESS_FRAME_H, counts: SORCERESS_FRAME_COUNTS, durations: SORCERESS_FRAME_DURATIONS },
+  paladin: { sprites: PALADIN_SPRITES, frameW: PALADIN_FRAME_W, frameH: PALADIN_FRAME_H, counts: PALADIN_FRAME_COUNTS, durations: PALADIN_FRAME_DURATIONS },
+  knight:   { sprites: KNIGHT_SPRITES,  frameW: KNIGHT_FRAME_W,  frameH: KNIGHT_FRAME_H,  counts: KNIGHT_FRAME_COUNTS,  durations: KNIGHT_FRAME_DURATIONS }
+};
+ctx.imageSmoothingEnabled = false;
+
+
+// ---------- Configuração de Energia ----------
+const MAX_ENERGY = 10;
+const ENERGY_PER_SECOND = 1 / 2.8; // regenera 1 de elixir a cada 2,8 segundos
+let energy = 4;
+
+const energyBarInner = document.getElementById('energyBarInner');
+const energyLabel = document.getElementById('energyLabel');
+
+function updateEnergyUI() {
+  const pct = (energy / MAX_ENERGY) * 100;
+  energyBarInner.style.width = pct + '%';
+  energyLabel.textContent = `Energia: ${Math.floor(energy)} / ${MAX_ENERGY}`;
+}
+
+// ---------- Definições de Heróis ----------
+const HERO_TYPES = {
+  warrior:  { cost: 3, color: '#e74c3c', w: 40, h: 60, hp: 200, dmg: 10, atkRange: 35, atkCooldown: 0.8, speed: 70 },
+  archer:   { cost: 2, color: '#2ecc71', w: 32, h: 56, hp: 10,  dmg: 8,  atkRange: 220, atkCooldown: 0.667, speed: 80 },
+  mage:     { cost: 4, color: '#3498db', w: 36, h: 58, hp: 50, dmg: 40, atkRange: 180, atkCooldown: 1.4, speed: 60 },
+  sorceress:{ cost: 5, color: '#d35400', w: 36, h: 58, hp: 50, dmg: 40, atkRange: 180, atkCooldown: 1.4, speed: 60, canFly: true, flyHoverY: 90 },
+  witch:    { cost: 5, color: '#9b59b6', w: 38, h: 60, hp: 40, dmg: 30, atkRange: 160, atkCooldown: 1.6, speed: 55, summonInterval: 3 },
+  zombie:   { cost: 0, color: '#6b8f3a', w: 22, h: 44, hp: 2,  dmg: 2,  atkRange: 30,  atkCooldown: 0.6, speed: 33 }, // invocado pela bruxa, não jogável (velocidade reduzida pela metade)
+  guard:    { cost: 2, color: '#7b6f3a', w: 36, h: 58, hp: 15,   dmg: 5, atkRange: 32,  atkCooldown: 0.5, speed: 50, spawnCount: 4 },
+  healer:   { cost: 4, color: '#f1c40f', w: 34, h: 56, hp: 20, dmg: 8,  atkRange: 30,  atkCooldown: 1.2, speed: 60, healAmount: 12, healRadius: 260 },
+  knight:   { cost: 8, color: '#ecf0f1', w: 44, h: 64, hp: 80, dmg: 120, atkRange: 40, atkCooldown: 1.0, speed: 140 },
+  paladin:  { cost: 5, color: '#f39c12', w: 40, h: 60, hp: 150, dmg: 12, atkRange: 35, atkCooldown: 0.9, speed: 60, powerRange: 160, powerSpeed: 560, powerDuration: 2, powerAtkCooldown: 0.2 },
+  druid:    { cost: 4, color: '#27ae60', w: 36, h: 58, hp: 30, dmg: 0,  atkRange: 0,  atkCooldown: 999, speed: 55, buffPct: 0.50, buffRadius: 220 },
+};
+
+// ---------- Entidades ----------
+let heroes = [];
+let enemies = [];
+let projectiles = [];
+
+class Hero {
+  constructor(type, startX) {
+    const def = HERO_TYPES[type];
+    this.type = type;
+    this.w = def.w;
+    this.h = def.h;
+    this.x = startX !== undefined ? startX : 30;
+    this.y = GROUND_Y - this.h;
+    this.speed = def.speed;
+    this.hp = def.hp;
+    this.maxHp = def.hp;
+    this.dmg = def.dmg;
+    this.atkRange = def.atkRange;
+    this.atkCooldown = def.atkCooldown;
+    this.atkTimer = 0;
+    this.color = def.color;
+    this.alive = true;
+    this.attacking = false;
+    this.healAmount = def.healAmount || 0;
+    this.healRadius = def.healRadius || 0;
+    this.healTimer = 0;
+    this.healing = false;
+    this.summonInterval = def.summonInterval || 0;
+    this.summonTimer = this.summonInterval;
+    this.buffPct = def.buffPct || 0;
+    this.buffRadius = def.buffRadius || 0;
+    this.buffPulseTimer = 1 + Math.random() * 1.5; // dessincroniza múltiplos druidas
+    this.buffPulseActive = false;
+    this.buffPulseElapsed = 0;
+    this.isSupport = this.buffPct > 0 || this.healAmount > 0; // não avança para a linha de frente, fica na retaguarda
+    this.age = 0;
+    this.laneOffset = (Math.random() - 0.5) * 50; // leve variação lateral para não empilhar com outros heróis
+    // Os heróis se distribuem em duas fileiras (como numa formação real):
+    // suporte sempre na fileira de trás; os demais alternam de fileira
+    // conforme a ordem de invocação, para não ficarem todos enfileirados
+    // numa única linha quando vários do mesmo tipo são colocados juntos.
+    const isBackRow = this.isSupport || (heroes.length % 2 === 1);
+    this.rowOffsetY = isBackRow ? -40 : 0;
+    this.y += this.rowOffsetY;
+
+    // Paladina: poder único de fúria sagrada
+    this.powerRange = def.powerRange || 0;
+    this.powerSpeed = def.powerSpeed || 0;
+    this.powerDuration = def.powerDuration || 0;
+    this.powerAtkCooldown = def.powerAtkCooldown || 0;
+    this.powerUsed = false;
+    this.powered = false;
+    this.powerEndAt = 0;
+    this.baseSpeed = this.speed;
+    this.baseAtkCooldown = this.atkCooldown;
+
+    // Feiticeira: flutua/voa enquanto houver inimigo dentro do alcance dela
+    this.canFly = def.canFly || false;
+    this.flyHoverY = def.flyHoverY || 0;
+    this.isFlying = false;
+    this.groundY = this.y;
+
+    // Tríplice Sagrada: enquanto ativa, este herói fica "fora de jogo" (flutuando no céu)
+    this.inCombo = false;
+
+    // Animação do Guerreiro (sprites)
+    this.animState = 'idle';
+    this.animFrame = 0;
+    this.animTime = 0;
+    this.hitTimer = 0;
+    this.facing = 1; // 1 = direita, -1 = esquerda (vira para o inimigo quando o ultrapassa)
+  }
+
+  update(dt) {
+    if (!this.alive) return;
+    this.age += dt;
+    const prevX = this.x;
+
+    // Tríplice Sagrada: enquanto o golpe especial está ativo, este herói não age
+    // normalmente — sua posição e ataque são controlados pelo sistema do combo.
+    if (this.inCombo) return;
+
+    // Paladina: ativa o poder de fúria sagrada uma única vez, ao detectar inimigo a 160px
+    if (this.powerRange > 0 && !this.powerUsed) {
+      const nearEnemy = enemies.some(e => {
+        if (!e.alive) return false;
+        const dist = e.x - (this.x + this.w);
+        return dist <= this.powerRange && dist > -e.w;
+      });
+      if (nearEnemy) {
+        this.powerUsed = true;
+        this.powered = true;
+        this.powerEndAt = this.age + this.powerDuration;
+        this.speed = this.powerSpeed;
+        this.atkCooldown = this.powerAtkCooldown;
+        this.atkTimer = 0;
+      }
+    }
+    if (this.powered && this.age >= this.powerEndAt) {
+      this.powered = false;
+      this.speed = this.baseSpeed;
+      this.atkCooldown = this.baseAtkCooldown;
+    }
+
+    // Bruxa: invoca um zumbi a cada X segundos enquanto estiver viva
+    if (this.summonInterval > 0) {
+      this.summonTimer -= dt;
+      if (this.summonTimer <= 0) {
+        this.summonTimer = this.summonInterval;
+        const zDef = HERO_TYPES.zombie;
+        const spawnX = Math.max(10, this.x - zDef.w - 10);
+        heroes.push(new Hero('zombie', spawnX));
+      }
+    }
+
+    // Curandeiro: cura heróis próximos continuamente, além de poder atacar
+    if (this.healAmount > 0) {
+      this.healTimer -= dt;
+      if (this.healTimer <= 0) {
+        this.healTimer = 1; // cura a cada 1 segundo
+        this.healing = false;
+        for (const h of heroes) {
+          if (h === this || !h.alive) continue;
+          const dist = Math.abs(h.x - this.x);
+          if (dist <= this.healRadius && h.hp < h.maxHp) {
+            h.hp = Math.min(h.maxHp, h.hp + this.healAmount);
+            this.healing = true;
+          }
+        }
+      }
+    }
+
+    // Druida: pulsa a animação do golpe de energia a cada poucos segundos,
+    // só para efeito visual da aura (o bônus de dano em si é contínuo).
+    if (this.buffPct > 0) {
+      this.buffPulseTimer -= dt;
+      if (this.buffPulseTimer <= 0) {
+        this.buffPulseTimer = 2.5; // pulsa a cada 2.5s
+        this.buffPulseActive = true;
+        this.buffPulseElapsed = 0;
+      }
+      if (this.buffPulseActive) {
+        this.buffPulseElapsed += dt;
+        const pulseDur = DRUID_FRAME_COUNTS.attack * DRUID_FRAME_DURATIONS.attack;
+        if (this.buffPulseElapsed >= pulseDur) this.buffPulseActive = false;
+      }
+    }
+
+    // procura inimigo mais próximo dentro do alcance
+    const target = this.atkRange > 0 ? this.findTarget() : null;
+
+    // Vira o herói para o lado onde está o inimigo (caso ele já tenha avançado além do alvo)
+    if (target) {
+      const targetCenter = target.x + target.w / 2;
+      const myCenter = this.x + this.w / 2;
+      // Só vira se a diferença for significativa (evita flip rápido ao cruzar o inimigo)
+      const diff = targetCenter - myCenter;
+      if (Math.abs(diff) > this.w * 0.4) {
+        this.facing = diff < 0 ? -1 : 1;
+      }
+    } else {
+      // Sem target: orienta o facing pelo inimigo vivo mais próximo
+      let nearestEnemy = null;
+      let nearestDist = Infinity;
+      for (const e of enemies) {
+        if (!e.alive) continue;
+        const d = Math.abs((e.x + e.w / 2) - (this.x + this.w / 2));
+        if (d < nearestDist) { nearestDist = d; nearestEnemy = e; }
+      }
+      if (nearestEnemy !== null) {
+        const targetCenter = nearestEnemy.x + nearestEnemy.w / 2;
+        const myCenter = this.x + this.w / 2;
+        this.facing = targetCenter < myCenter ? -1 : 1;
+      }
+    }
+
+    // Feiticeira: flutua/voa enquanto houver inimigo dentro do alcance dela
+    if (this.canFly) {
+      this.isFlying = !!target;
+      this.y = this.isFlying ? (this.groundY - this.flyHoverY) : this.groundY;
+    }
+
+    // Curandeiro: só ataca se não houver outro herói vivo em campo
+    const isHealer = this.healAmount > 0;
+    const shouldAttack = target && (!isHealer || !this.hasOtherHeroAlive());
+
+    if (shouldAttack) {
+      this.attacking = true;
+      this.atkTimer -= dt;
+      if (this.atkTimer <= 0) {
+        this.atkTimer = this.atkCooldown;
+        this.performAttack(target);
+      }
+    } else {
+      this.attacking = this.buffPulseActive;
+      if (this.isSupport && this.hasOtherHeroAlive()) {
+        // Suporte (curandeiro/druida): só fica na retaguarda quando há outro herói para proteger
+        const rearX = this.getRearPosition();
+        if (this.x > rearX) {
+          this.x -= this.speed * dt;
+          if (this.x < rearX) this.x = rearX;
+        } else if (this.x < rearX - 2) {
+          this.x += this.speed * dt;
+        }
+      } else {
+        // Sozinho em campo (ou herói comum): segue a linha de frente do
+        // inimigo mais próximo (mesmo que não consiga atacá-lo, como o
+        // dragão visto por heróis corpo a corpo). Avança ou recua conforme
+        // necessário, para não ficar "preso" caso o inimigo passe por ele.
+        const frontLimit = this.getFrontLimit();
+        if (this.x < frontLimit) {
+          this.x += this.speed * dt;
+          if (this.x > frontLimit) this.x = frontLimit;
+        } else if (this.x > frontLimit + 2) {
+          this.x -= this.speed * dt;
+          if (this.x < frontLimit) this.x = frontLimit;
+        }
+      }
+    }
+
+    // Animação por sprites (Guerreiro e Arqueiro têm sprite dedicado)
+    const spriteCfg = SPRITE_CONFIGS[this.type];
+    if (spriteCfg) {
+      this.hitTimer = Math.max(0, this.hitTimer - dt);
+      const isMoving = Math.abs(this.x - prevX) > 0.01;
+      const nextState = this.hitTimer > 0 ? 'hit'
+        : this.attacking ? 'attack'
+        : isMoving ? 'walk'
+        : 'idle';
+      if (nextState !== this.animState) {
+        this.animState = nextState;
+        this.animFrame = 0;
+        this.animTime = 0;
+      }
+      this.animTime += dt;
+      const frameDur = spriteCfg.durations[this.animState];
+      const count = spriteCfg.counts[this.animState];
+      if (this.animTime >= frameDur) {
+        this.animTime -= frameDur;
+        this.animFrame = (this.animFrame + 1) % count;
+      }
+    }
+  }
+
+  hasOtherHeroAlive() {
+    return heroes.some(h => h !== this && h.alive);
+  }
+
+  getFrontLimit() {
+    // posição máxima que o herói pode avançar: dentro do seu próprio alcance
+    // de ataque em relação ao inimigo vivo mais próximo, com um leve
+    // deslocamento lateral (laneOffset) para que vários heróis parados ali
+    // não fiquem exatamente um em cima do outro — mas sem nunca empurrá-lo
+    // para fora do alcance de ataque (senão ele fica parado sem atacar).
+    let nearestEnemy = null;
+    let nearestDist = Infinity;
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const d = Math.abs(e.x - this.x);
+      if (d < nearestDist) { nearestDist = d; nearestEnemy = e; }
+    }
+    if (nearestEnemy === null) return Math.round(W * 0.68) - this.w; // aguarda no limite do campo inimigo
+
+    // considera a margem transparente do sprite do orc, para o herói poder
+    // avançar até perto da perna visível em vez de parar na borda da hitbox
+    const nearestX = nearestEnemy.x + (nearestEnemy.hitboxInset || 0);
+
+    // Se o herói já passou do inimigo (inimigo está à esquerda), deve recuar
+    // para ficar à esquerda do inimigo dentro do alcance de ataque.
+    if (this.x > nearestX + nearestEnemy.w) {
+      // retorna posição à esquerda do inimigo para o herói recuar até lá
+      const limit = nearestX - this.w;
+      return Math.max(10, limit);
+    }
+
+    // Distância de parada em relação ao inimigo: varia um pouco por herói
+    // (laneOffset) para não empilhar todos no mesmo pixel, mas nunca pode
+    // ultrapassar o alcance de ataque do próprio herói — senão ele para
+    // fora do alcance e fica preso sem conseguir atacar.
+    const maxStandoff = this.atkRange > 0 ? Math.max(0, this.atkRange - 5) : 0;
+    const variation = Math.min(25, maxStandoff);
+    // laneOffset vai de -25 a +25; remapeia para 0..variation (sempre dentro do alcance)
+    const standoff = variation > 0 ? ((this.laneOffset + 25) / 50) * variation : 0;
+    const limit = nearestX - this.w - standoff;
+    return Math.max(10, Math.min(limit, W - this.w));
+  }
+
+  getRearPosition() {
+    // ignora heróis recém-invocados (ainda "se ajustando" à formação) para que
+    // um spawn novo não puxe o curandeiro de volta instantaneamente — mas, ao
+    // contrário de um filtro por distância, isso não trava o curandeiro preso
+    // no ponto de nascimento quando o resto do grupo já está longe na frente.
+    // Outros curandeiros também são ignorados, senão dois curandeiros ficam
+    // se perseguindo um atrás do outro.
+    const SETTLE_TIME = 1.2; // segundos
+    let minX = null;
+    for (const h of heroes) {
+      if (h === this || !h.alive) continue;
+      if (h.isSupport) continue;
+      if (h.age < SETTLE_TIME) continue;
+      if (minX === null || h.x < minX) minX = h.x;
+    }
+    if (minX === null) {
+      // ninguém "assentado" ainda: se não há nenhum herói (não suporte) vivo, volta para a base; senão, fica parado por um instante
+      const hasNonHealerAlive = heroes.some(h => h !== this && h.alive && !h.isSupport);
+      return hasNonHealerAlive ? this.x : 30;
+    }
+    return Math.max(10, minX - this.w - 10);
+  }
+
+  findTarget() {
+    let closest = null;
+    let closestDist = Infinity;
+    const isRanged = this.type === 'archer' || this.type === 'mage' || this.type === 'witch' || this.type === 'sorceress';
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      if (e.isDragon && !isRanged) continue; // heróis corpo a corpo não alcançam o dragão voador
+      // para o orc, a "borda" efetiva considera a margem transparente do sprite,
+      // senão o herói para de andar antes de chegar perto visualmente da perna
+      const effectiveLeft = (e.hitboxInset ? e.x + e.hitboxInset : e.x);
+      const dist = effectiveLeft - (this.x + this.w);
+      // Heróis à distância (e a Feiticeira, que voa por cima dos inimigos) miram
+      // em qualquer direção dentro do alcance, mesmo já tendo ultrapassado o
+      // inimigo — senão o alvo "sumia" de repente ao cruzar, fazendo o herói
+      // alternar voando/parado e avançar/recuar sem parar.
+      const inRange = isRanged
+        ? Math.abs(dist) <= this.atkRange
+        : (dist <= this.atkRange && dist > -e.w);
+      if (inRange) {
+        if (Math.abs(dist) < closestDist) {
+          closestDist = Math.abs(dist);
+          closest = e;
+        }
+      }
+    }
+    return closest;
+  }
+
+  getDamageBonus() {
+    // soma o bônus percentual de todos os druidas (ou outros buffers) vivos dentro do raio
+    let bonus = 0;
+    for (const h of heroes) {
+      if (h === this || !h.alive || !h.buffPct) continue;
+      const dist = Math.abs(h.x - this.x);
+      if (dist <= h.buffRadius) bonus += h.buffPct;
+    }
+    return bonus;
+  }
+
+  performAttack(target) {
+    const dmg = this.dmg * (1 + this.getDamageBonus());
+    if (this.type === 'paladin' && this.powered) {
+      // Fúria sagrada: atinge todos os inimigos vivos de uma vez
+      for (const e of enemies) {
+        if (e.alive) e.takeDamage(dmg);
+      }
+    } else if (this.type === 'archer' || this.type === 'mage' || this.type === 'witch' || this.type === 'sorceress') {
+      // ataque a distância: cria projétil. Mago aplica lentidão ao acertar.
+      const slowConfig = this.type === 'mage' ? { factor: 0.4, duration: 2500 } : null;
+      const originX = this.facing === -1 ? this.x : this.x + this.w;
+      projectiles.push(new Projectile(
+        originX, this.y + this.h / 2,
+        target, dmg, this.color, slowConfig
+      ));
+    } else {
+      // ataque corpo a corpo direto
+      target.takeDamage(dmg);
+    }
+  }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (amount > 0) {
+      if (this.type === 'warrior') this.hitTimer = WARRIOR_FRAME_DURATIONS.hit;
+      else if (this.type === 'archer') this.hitTimer = ARCHER_FRAME_COUNTS.hit * ARCHER_FRAME_DURATIONS.hit;
+      else if (this.type === 'witch') this.hitTimer = WITCH_FRAME_COUNTS.hit * WITCH_FRAME_DURATIONS.hit;
+      else if (this.type === 'mage') this.hitTimer = MAGE_FRAME_COUNTS.hit * MAGE_FRAME_DURATIONS.hit;
+      else if (this.type === 'guard') this.hitTimer = GUARD_FRAME_COUNTS.hit * GUARD_FRAME_DURATIONS.hit;
+      else if (this.type === 'healer') this.hitTimer = HEALER_FRAME_COUNTS.hit * HEALER_FRAME_DURATIONS.hit;
+      else if (this.type === 'druid') this.hitTimer = DRUID_FRAME_COUNTS.hit * DRUID_FRAME_DURATIONS.hit;
+      else if (this.type === 'zombie') this.hitTimer = ZOMBIE_FRAME_COUNTS.hit * ZOMBIE_FRAME_DURATIONS.hit;
+      else if (this.type === 'knight')  this.hitTimer = KNIGHT_FRAME_COUNTS.hit  * KNIGHT_FRAME_DURATIONS.hit;
+    }
+    if (this.hp <= 0) this.alive = false;
+  }
+
+  draw() {
+    if (!this.alive) return;
+
+    // sombra no chão enquanto a Feiticeira está voando
+    if (this.isFlying) {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(this.x + this.w / 2, this.groundY + this.h - 4, this.w * 0.45, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // corpo
+const spriteCfg = SPRITE_CONFIGS[this.type];
+if (spriteCfg && spriteCfg.sprites[this.animState] && spriteCfg.sprites[this.animState].complete && spriteCfg.sprites[this.animState].naturalWidth > 0) {
+  const img = spriteCfg.sprites[this.animState];
+  
+  // GUERREIRO: desenha o GIF inteiro sem recortar
+  if (this.type === 'warrior') {
+    const drawH = this.h * 2.0;
+    const drawW = this.w * 2.0;
+    const drawX = this.x + this.w / 2 - drawW / 2;
+    const drawY = (this.y + this.h) - drawH - 10;
+    
+    if (this.facing === -1) {
+      ctx.save();
+      ctx.translate(drawX + drawW, drawY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0, drawW, drawH);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    }
+  } else {
+    // OUTROS HERÓIS: spritesheet normal
+    const count = spriteCfg.counts[this.animState];
+    const frame = Math.min(this.animFrame, count - 1);
+    const realFrameW = img.naturalWidth / count;
+    const realFrameH = img.naturalHeight;
+    const sx = frame * realFrameW;
+    const drawH = this.h * 1.5;
+    const drawW = realFrameW * (drawH / realFrameH);
+    const drawX = this.x + this.w / 2 - drawW / 2;
+    const FOOT_OFFSET = 10;
+    let drawY = (this.y + this.h) - drawH - FOOT_OFFSET;
+    if (this.type === 'healer') {
+      drawY -= 4 + Math.sin(this.age * 4.5) * 4;
+    }
+    if (this.facing === -1) {
+      ctx.save();
+      ctx.translate(drawX + drawW, drawY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, sx, 0, realFrameW, realFrameH, 0, 0, drawW, drawH);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img, sx, 0, realFrameW, realFrameH, drawX, drawY, drawW, drawH);
+    }
+  }
+} else {
+  ctx.fillStyle = this.color;
+  ctx.fillRect(this.x, this.y, this.w, this.h);
+}
+    
+
+    // indicador de ataque (sprites do Guerreiro/Arqueiro/Bruxa/Mago/Guarda já mostram o golpe visualmente)
+    if (this.attacking && this.type !== 'warrior' && this.type !== 'archer' && this.type !== 'witch' && this.type !== 'mage' && this.type !== 'sorceress' && this.type !== 'guard' && this.type !== 'healer' && this.type !== 'druid' && this.type !== 'zombie' && this.type !== 'paladin' && this.type !== 'knight') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+
+
+    // indicador de aura de buff (druida)
+    if (this.buffPct > 0) {
+      ctx.strokeStyle = 'rgba(39,174,96,0.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.buffRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // indicador de fúria sagrada (Paladina)
+    if (this.powered) {
+      ctx.strokeStyle = 'rgba(255,215,0,0.8)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w * 1.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Tríplice Sagrada: luz dourada pulsante envolvendo os três heróis no céu
+    if (this.inCombo) {
+      const pulse = 6 + Math.sin(performance.now() / 120) * 3;
+      ctx.fillStyle = 'rgba(255,235,150,0.35)';
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w * 0.9 + pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // barra de vida (acima da cabeça do sprite)
+    const barW = this.w;
+    const barH = 5;
+    const hpPct = Math.max(this.hp / this.maxHp, 0);
+    const barY = this.y - Math.round(this.h * 0.5) - 14;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(this.x, barY, barW, barH);
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect(this.x, barY, barW * hpPct, barH);
+  }
+}
+
+class Enemy {
+  constructor(spawnIndex) {
+    // Inimigo orc: 2.5x o tamanho médio de um herói
+    this.w = 95;
+    this.h = 145;
+    // Fileiras alternadas: índice par = frente (rowOffset 0), ímpar = trás (rowOffset -40)
+    const isBackRow = (spawnIndex || 0) % 2 === 1;
+    this.rowOffsetY = isBackRow ? -40 : 0;
+    this._targetX = Math.round(W * 0.68) - Math.round(this.w / 2) + (isBackRow ? -60 : 0);
+    this.x = W + this.w + 20;
+    // yOffset negativo sobe o orc para alinhar os pés com os heróis
+    this.yOffset = -30;
+    this.y = GROUND_Y - this.h + this.rowOffsetY + this.yOffset;
+    this.maxHp = 600;
+    this.hp = this.maxHp;
+    this.dmg = 10; // dano por ataque contra heróis próximos
+    this.alive = true;
+    this.atkTimer = 0;
+    this.atkCooldown = 1.0;
+    this.atkRange = 20;
+    this.speed = 18; // bem lento
+    this.slowUntil = 0;
+    this.slowFactor = 1;
+    // o sprite do orc tem uma margem transparente à esquerda (cerca de 26% da
+    // largura do frame, onde fica a perna/braço recuado); sem compensar isso,
+    // heróis corpo a corpo paravam de andar e atacavam "de longe", antes de
+    // realmente encostar na perna visível do orc.
+    this.hitboxInset = this.w * 0.30;
+    // animação por sprites
+    this.animState = 'walk';
+    this.animFrame = 0;
+    this.animTime = 0;
+    this.dying = false;          // tocando animação de derrota
+    this.reachedGoal = false;    // chegou ao objetivo, tocando animação de vitória
+    this.victoryAnimTimer = 0;
+  }
+
+  applySlow(durationMs, factor = 0.4) {
+    this.slowUntil = performance.now() + durationMs;
+    this.slowFactor = factor;
+  }
+
+  getEffectiveSpeed() {
+    return (performance.now() < this.slowUntil) ? this.speed * this.slowFactor : this.speed;
+  }
+
+  update(dt) {
+    if (!this.alive) return;
+    if (performance.now() < (this.paralyzedUntil || 0)) return; // Tríplice Sagrada: paralisado
+
+    if (this.reachedGoal) {
+      this.advanceAnim(dt, 'victory', false);
+      return; // só fica animando a vitória; o game loop decide quando dar Game Over
+    }
+
+    if (this.dying) {
+      this.advanceAnim(dt, 'defeat', false);
+      if (this.animFrame >= ORC_FRAME_COUNTS.defeat - 1 && this.animTime >= ORC_FRAME_DURATIONS.defeat) {
+        this.alive = false; // animação de derrota terminou
+      }
+      return;
+    }
+
+    const targets = this.findTargets();
+
+    if (targets.length > 0) {
+      // parado, atacando apenas um herói por vez (o mais próximo)
+      this.atkTimer -= dt;
+      if (this.atkTimer <= 0) {
+        targets[0].takeDamage(this.dmg);
+        this.atkTimer = this.atkCooldown;
+      }
+    } else {
+      // anda lentamente para a esquerda, em direção aos heróis
+      const _orcSpd = this.getEffectiveSpeed();
+      if (this.x > (this._targetX || 0) + this.w * 0.5) {
+        this.x -= Math.max(_orcSpd, 120) * dt;
+      } else {
+        this.x -= _orcSpd * dt;
+      }
+      if (this.x <= 0) {
+        this.x = 0;
+        this.reachedGoal = true;
+        this.animState = 'victory';
+        this.animFrame = 0;
+        this.animTime = 0;
+        return;
+      }
+    }
+    this.advanceAnim(dt, 'walk', true);
+  }
+
+  // avança a animação por sprite; loop=true repete, loop=false para no último frame
+  advanceAnim(dt, state, loop) {
+    if (this.animState !== state) {
+      this.animState = state;
+      this.animFrame = 0;
+      this.animTime = 0;
+    }
+    const count = ORC_FRAME_COUNTS[state];
+    const dur = ORC_FRAME_DURATIONS[state];
+
+    // já no último frame de uma animação que não repete: só acumula o tempo
+    // (sem isso, o tempo ficava sendo descontado para sempre e a animação nunca
+    // era considerada "terminada" - era a causa do orc morto travar no campo)
+    if (!loop && this.animFrame >= count - 1) {
+      this.animTime += dt;
+      return;
+    }
+
+    this.animTime += dt;
+    if (this.animTime >= dur) {
+      this.animTime -= dur;
+      if (this.animFrame < count - 1) {
+        this.animFrame++;
+      } else if (loop) {
+        this.animFrame = 0;
+      }
+    }
+  }
+
+  findTargets() {
+    return heroes
+      .filter(h => {
+        if (!h.alive) return false;
+        if (h.isFlying || h.inCombo) return false; // corpo a corpo não alcança heróis voando ou em combo
+        const dist = this.x - (h.x + h.w);
+        return dist <= this.atkRange && dist > -this.w;
+      })
+      .sort((a, b) => (this.x - (a.x + a.w)) - (this.x - (b.x + b.w)));
+  }
+
+  takeDamage(amount) {
+    if (this.dying || this.reachedGoal) return; // já está em animação final, ignora dano
+    this.hp -= amount;
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.dying = true;
+      this.animState = 'defeat';
+      this.animFrame = 0;
+      this.animTime = 0;
+    }
+  }
+
+  draw() {
+    if (!this.alive) return;
+    if (performance.now() < (this.paralyzedUntil || 0)) {
+      ctx.strokeStyle = 'rgba(255,235,150,0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#fff7c2';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡', this.x + this.w / 2, this.y - 6);
+      ctx.textAlign = 'left';
+    }
+    // corpo do orc (sprite animado, com fallback de retângulo)
+    const orcImg = ORC_SPRITES[this.animState];
+    if (orcImg && orcImg.complete && orcImg.naturalWidth > 0) {
+      const count = ORC_FRAME_COUNTS[this.animState];
+      const frame = Math.min(this.animFrame, count - 1);
+      const sx = frame * ORC_FRAME_W;
+      const drawH = this.h;
+      const drawW = ORC_FRAME_W * (drawH / ORC_FRAME_H);
+      const drawX = this.x + this.w / 2 - drawW / 2;
+      const drawY = (this.y + this.h) - drawH;
+
+      if (performance.now() < this.slowUntil) {
+        // desenha o sprite + tint num buffer isolado, para o tint não vazar sobre o fundo
+        if (!this._slowBuffer) {
+          this._slowBuffer = document.createElement('canvas');
+        }
+        const buf = this._slowBuffer;
+        buf.width = ORC_FRAME_W;
+        buf.height = ORC_FRAME_H;
+        const bctx = buf.getContext('2d');
+        bctx.clearRect(0, 0, buf.width, buf.height);
+        bctx.drawImage(orcImg, sx, 0, ORC_FRAME_W, ORC_FRAME_H, 0, 0, ORC_FRAME_W, ORC_FRAME_H);
+        bctx.globalCompositeOperation = 'source-atop';
+        bctx.fillStyle = 'rgba(80,180,255,0.45)';
+        bctx.fillRect(0, 0, ORC_FRAME_W, ORC_FRAME_H);
+        ctx.drawImage(buf, 0, 0, ORC_FRAME_W, ORC_FRAME_H, drawX, drawY, drawW, drawH);
+      } else {
+        ctx.drawImage(orcImg, sx, 0, ORC_FRAME_W, ORC_FRAME_H, drawX, drawY, drawW, drawH);
+      }
+    } else {
+      ctx.fillStyle = '#7f1d1d';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+      if (performance.now() < this.slowUntil) {
+        ctx.fillStyle = 'rgba(80,180,255,0.35)';
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+      }
+    }
+
+    // barra de vida grande (oculta durante as animações finais de derrota/vitória)
+    if (!this.dying && !this.reachedGoal) {
+      const barW = this.w;
+      const barH = 14;
+      const hpPct = Math.max(this.hp / this.maxHp, 0);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(this.x, this.y - 22, barW, barH);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(this.x, this.y - 22, barW * hpPct, barH);
+    }
+  }
+}
+
+class Dragon {
+  constructor(spawnIndex) {
+    // Gárgula: voa bem alto no céu, só pode ser atingida por heróis que atiram à distância
+    this.isDragon = true;
+    this.w = 38 * 4.5;
+    this.h = 58 * 4.5;
+    const _drIsBack = (spawnIndex || 0) % 2 === 1;
+    this.rowOffsetY = _drIsBack ? -60 : 0;
+    this._targetX = Math.round(W * 0.68) - Math.round(this.w / 2) + (_drIsBack ? -80 : 0);
+    this.x = W + this.w + 20;
+    this.y = 40 + this.rowOffsetY; // voando bem alto no céu, longe do chão
+    this.maxHp = 500;
+    this.hp = this.maxHp;
+    this.dmg = 10;
+    this.alive = true;
+    this.atkTimer = 0;
+    this.atkCooldown = 1.2;
+    this.atkRange = 320; // alcance de voo/fogo, maior que o do gigante
+    this.speed = 18;
+    this.flapPhase = Math.random() * Math.PI * 2;
+    this.slowUntil = 0;
+    this.slowFactor = 1;
+    // animação sprite
+    this.animFrame = 0;
+    this.animTimer = 0;
+  }
+
+  applySlow(durationMs, factor = 0.4) {
+    this.slowUntil = performance.now() + durationMs;
+    this.slowFactor = factor;
+  }
+
+  getEffectiveSpeed() {
+    return (performance.now() < this.slowUntil) ? this.speed * this.slowFactor : this.speed;
+  }
+
+  update(dt) {
+    if (!this.alive) return;
+    if (performance.now() < (this.paralyzedUntil || 0)) return; // Tríplice Sagrada: paralisado
+    this.flapPhase += dt * 4;
+
+    // avança frame de asa
+    this.animTimer += dt;
+    if (this.animTimer >= DRAGON_FRAME_DUR) {
+      this.animTimer -= DRAGON_FRAME_DUR;
+      this.animFrame = (this.animFrame + 1) % DRAGON_FRAME_COUNT;
+    }
+
+    const target = this.findTarget();
+    const spd = this.getEffectiveSpeed();
+    if (target) {
+      this.atkTimer -= dt;
+      if (this.atkTimer <= 0) {
+        this.atkTimer = this.atkCooldown;
+        projectiles.push(new Projectile(
+          this.x, this.y + this.h / 2,
+          target, this.dmg, '#ff7b1a'
+        ));
+      }
+      // mantém alguma distância, mas continua se aproximando lentamente
+      if (this.x > (this._targetX || 0) + this.w * 0.5) {
+        this.x -= Math.max(spd, 80) * dt;
+      } else {
+        this.x -= spd * dt;
+      }
+    } else {
+      if (this.x > (this._targetX || 0) + this.w * 0.5) {
+        this.x -= Math.max(spd, 80) * dt;
+      } else {
+        this.x -= spd * dt;
+      }
+    }
+  }
+
+  findTarget() {
+    let closest = null;
+    let closestDist = Infinity;
+    for (const h of heroes) {
+      if (!h.alive) continue;
+      const dist = this.x - (h.x + h.w);
+      if (dist <= this.atkRange && dist > -this.w) {
+        if (Math.abs(dist) < closestDist) {
+          closestDist = Math.abs(dist);
+          closest = h;
+        }
+      }
+    }
+    return closest;
+  }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (this.hp <= 0) {
+      this.alive = false;
+    }
+  }
+
+  draw() {
+    if (!this.alive) return;
+
+    // efeito de paralisação
+    if (performance.now() < (this.paralyzedUntil || 0)) {
+      ctx.strokeStyle = 'rgba(255,235,150,0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#fff7c2';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡', this.x + this.w / 2, this.y - 6);
+      ctx.textAlign = 'left';
+    }
+
+    // sprite de voo (sem espelhamento: gárgula voa para a esquerda corretamente)
+    const sx = this.animFrame * DRAGON_FRAME_W;
+    ctx.drawImage(DRAGON_SPRITE_IMG, sx, 0, DRAGON_FRAME_W, DRAGON_FRAME_H, this.x, this.y, this.w, this.h);
+
+    // overlay de slow (círculo translúcido, sem quadrado)
+    if (performance.now() < this.slowUntil) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = 'rgba(80,180,255,1)';
+      ctx.beginPath();
+      ctx.ellipse(this.x + this.w/2, this.y + this.h/2, this.w*0.55, this.h*0.55, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // barra de vida
+    const barW = this.w;
+    const barH = 14;
+    const hpPct = Math.max(this.hp / this.maxHp, 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(this.x, this.y - 22, barW, barH);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(this.x, this.y - 22, barW * hpPct, barH);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.x, this.y - 22, barW, barH);
+  }
+}
+
+class StoneGiant {
+  constructor(spawnIndex) {
+    // Gigante de Pedra: 4x o tamanho médio de um herói, corpo a corpo, ataca até 3 alvos ao mesmo tempo
+    this.w = 38 * 4;
+    this.h = 58 * 4;
+    const _sgIsBack = (spawnIndex || 0) % 2 === 1;
+    this.rowOffsetY = _sgIsBack ? -40 : 0;
+    this._targetX = Math.round(W * 0.68) - Math.round(this.w / 2) + (_sgIsBack ? -60 : 0);
+    this.x = W + this.w + 20;
+    this.y = GROUND_Y - this.h + this.rowOffsetY;
+    this.maxHp = 1000;
+    this.hp = this.maxHp;
+    this.dmg = 19;
+    this.alive = true;
+    this.atkTimer = 0;
+    this.atkCooldown = 1.0;
+    this.atkRange = 20;
+    this.speed = 9; // bem lento
+    this.maxTargets = 3;
+    this.deathDmg = 40;
+    this.deathRadius = 140; // alcance da queda de pedras ao morrer
+    this.slowUntil = 0;
+    this.slowFactor = 1;
+    // animação sprite
+    this.animFrame = 0;
+    this.animTimer = 0;
+  }
+
+  applySlow(durationMs, factor = 0.4) {
+    this.slowUntil = performance.now() + durationMs;
+    this.slowFactor = factor;
+  }
+
+  getEffectiveSpeed() {
+    return (performance.now() < this.slowUntil) ? this.speed * this.slowFactor : this.speed;
+  }
+
+  update(dt) {
+    if (!this.alive) return;
+    if (performance.now() < (this.paralyzedUntil || 0)) return; // Tríplice Sagrada: paralisado
+    const targets = this.findTargets();
+
+    // avança animação de walk (sempre, parado ou não — parece respirar/ameaçar)
+    this.animTimer += dt;
+    const frameDur = GIANT_FRAME_DURATIONS.walk;
+    if (this.animTimer >= frameDur) {
+      this.animTimer -= frameDur;
+      this.animFrame = (this.animFrame + 1) % GIANT_FRAME_COUNTS.walk;
+    }
+
+    if (targets.length > 0) {
+      // parado, atacando até 3 heróis mais próximos simultaneamente
+      this.atkTimer -= dt;
+      if (this.atkTimer <= 0) {
+        this.atkTimer = this.atkCooldown;
+        targets.slice(0, this.maxTargets).forEach(h => h.takeDamage(this.dmg));
+      }
+    } else {
+      // anda lentamente para a esquerda, em direção aos heróis
+      const _sgSpd = this.getEffectiveSpeed();
+      if (this.x > (this._targetX || 0) + this.w * 0.5) {
+        this.x -= Math.max(_sgSpd, 120) * dt;
+      } else {
+        this.x -= _sgSpd * dt;
+      }
+    }
+  }
+
+  findTargets() {
+    return heroes
+      .filter(h => {
+        if (!h.alive) return false;
+        if (h.isFlying || h.inCombo) return false; // corpo a corpo não alcança heróis voando ou em combo
+        const dist = this.x - (h.x + h.w);
+        return dist <= this.atkRange && dist > -this.w;
+      })
+      .sort((a, b) => (this.x - (a.x + a.w)) - (this.x - (b.x + b.w)));
+  }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (this.hp <= 0 && this.alive) {
+      this.alive = false;
+      this.onDeath();
+    }
+  }
+
+  onDeath() {
+    // Pedaços de pedra caem no chão, atingindo todos os heróis próximos
+    const cx = this.x + this.w / 2;
+    for (const h of heroes) {
+      if (!h.alive) continue;
+      const hcx = h.x + h.w / 2;
+      if (Math.abs(hcx - cx) <= this.deathRadius) {
+        h.takeDamage(this.deathDmg);
+      }
+    }
+    rockBursts.push({ x: cx, y: this.y + this.h * 0.6, radius: this.deathRadius, until: performance.now() + 400 });
+  }
+
+  draw() {
+    if (!this.alive) return;
+
+    // efeito de paralisação
+    if (performance.now() < (this.paralyzedUntil || 0)) {
+      ctx.strokeStyle = 'rgba(255,235,150,0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#fff7c2';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡', this.x + this.w / 2, this.y - 6);
+      ctx.textAlign = 'left';
+    }
+
+    // sprite de walk (sprite já olha para a esquerda, sem espelhamento)
+    const img = GIANT_SPRITES.walk;
+    const frameW = img.naturalWidth  / GIANT_FRAME_COUNTS.walk;
+    const frameH = img.naturalHeight;
+    const sx = this.animFrame * frameW;
+    ctx.drawImage(img, sx, 0, frameW, frameH, this.x, this.y, this.w, this.h);
+
+    // overlay de slow (círculo translúcido)
+    if (performance.now() < this.slowUntil) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = 'rgba(80,180,255,1)';
+      ctx.beginPath();
+      ctx.ellipse(this.x + this.w/2, this.y + this.h/2, this.w*0.55, this.h*0.55, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // barra de vida grande
+    const barW = this.w;
+    const barH = 14;
+    const hpPct = Math.max(this.hp / this.maxHp, 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(this.x, this.y - 22, barW, barH);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(this.x, this.y - 22, barW * hpPct, barH);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.x, this.y - 22, barW, barH);
+  }
+}
+
+class ZombieEnemy {
+  constructor(x, spawnIndex) {
+    // Zumbi inimigo: mesmas características do zumbi invocado pela bruxa-herói
+    const zDef = HERO_TYPES.zombie;
+    this.w = zDef.w;
+    this.h = zDef.h;
+    this.x = x !== undefined ? x : (W - this.w - 20);
+    // Fileiras alternadas: índice par = frente (mesma linha dos heróis),
+    // índice ímpar = trás, igual ao padrão já usado pelos heróis e pelos
+    // demais inimigos (orc, dragão, etc.) — evita que vários zumbis nasçam
+    // todos amontoados numa única linha bem baixa, colada na barra de energia.
+    const isBackRow = (spawnIndex || 0) % 2 === 1;
+    this.rowOffsetY = isBackRow ? -40 : 0;
+    // yOffset negativo sobe o zumbi para alinhar com os heróis
+    this.yOffset = -10;
+    this.y = GROUND_Y - this.h + this.rowOffsetY + this.yOffset;
+    this.maxHp = zDef.hp;
+    this.hp = this.maxHp;
+    this.dmg = zDef.dmg;
+    this.alive = true;
+    this.atkTimer = 0;
+    this.atkCooldown = zDef.atkCooldown;
+    this.atkRange = zDef.atkRange;
+    this.speed = zDef.speed;
+    this.slowUntil = 0;
+    this.slowFactor = 1;
+
+    // Animação por sprites
+    this.animState = 'idle';
+    this.animFrame = 0;
+    this.animTime = 0;
+    this.hitTimer = 0;
+    this.attacking = false;
+  }
+
+  applySlow(durationMs, factor = 0.4) {
+    this.slowUntil = performance.now() + durationMs;
+    this.slowFactor = factor;
+  }
+
+  getEffectiveSpeed() {
+    return (performance.now() < this.slowUntil) ? this.speed * this.slowFactor : this.speed;
+  }
+
+  update(dt) {
+    if (!this.alive) return;
+    if (performance.now() < (this.paralyzedUntil || 0)) return; // Tríplice Sagrada: paralisado
+    const prevX = this.x;
+    const targets = this.findTargets();
+
+    if (targets.length > 0) {
+      this.attacking = true;
+      this.atkTimer -= dt;
+      if (this.atkTimer <= 0) {
+        targets[0].takeDamage(this.dmg);
+        this.atkTimer = this.atkCooldown;
+      }
+    } else {
+      this.attacking = false;
+      this.x -= this.getEffectiveSpeed() * dt;
+    }
+
+    // Animação do sprite (zumbi inimigo usa o mesmo conjunto do zumbi-herói)
+    this.hitTimer = Math.max(0, this.hitTimer - dt);
+    const isMoving = Math.abs(this.x - prevX) > 0.01;
+    const nextState = this.hitTimer > 0 ? 'hit'
+      : this.attacking ? 'attack'
+      : isMoving ? 'walk'
+      : 'idle';
+    if (nextState !== this.animState) {
+      this.animState = nextState;
+      this.animFrame = 0;
+      this.animTime = 0;
+    }
+    this.animTime += dt;
+    const frameDur = ZOMBIE_FRAME_DURATIONS[this.animState];
+    const count = ZOMBIE_FRAME_COUNTS[this.animState];
+    if (this.animTime >= frameDur) {
+      this.animTime -= frameDur;
+      this.animFrame = (this.animFrame + 1) % count;
+    }
+  }
+
+  findTargets() {
+    return heroes
+      .filter(h => {
+        if (!h.alive) return false;
+        if (h.isFlying || h.inCombo) return false; // corpo a corpo não alcança heróis voando ou em combo
+        const dist = this.x - (h.x + h.w);
+        return dist <= this.atkRange && dist > -this.w;
+      })
+      .sort((a, b) => (this.x - (a.x + a.w)) - (this.x - (b.x + b.w)));
+  }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (amount > 0) this.hitTimer = ZOMBIE_FRAME_COUNTS.hit * ZOMBIE_FRAME_DURATIONS.hit;
+    if (this.hp <= 0) this.alive = false;
+  }
+
+  draw() {
+    if (!this.alive) return;
+    if (performance.now() < (this.paralyzedUntil || 0)) {
+      ctx.strokeStyle = 'rgba(255,235,150,0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#fff7c2';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡', this.x + this.w / 2, this.y - 6);
+      ctx.textAlign = 'left';
+    }
+
+    // corpo (sprite do zumbi, espelhado pois o inimigo anda/ataca para a esquerda)
+    const img = ZOMBIE_SPRITES[this.animState];
+    if (img && img.complete && img.naturalWidth > 0) {
+      const count = ZOMBIE_FRAME_COUNTS[this.animState];
+      const frame = Math.min(this.animFrame, count - 1);
+      const realFrameW = img.naturalWidth / count;
+      const realFrameH = img.naturalHeight;
+      const sx = frame * realFrameW;
+      const drawH = this.h * 1.5;
+      const drawW = realFrameW * (drawH / realFrameH);
+      const drawX = this.x + this.w / 2 - drawW / 2;
+      const drawY = (this.y + this.h) - drawH;
+      ctx.save();
+      ctx.translate(drawX + drawW, drawY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, sx, 0, realFrameW, realFrameH, 0, 0, drawW, drawH);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#3f5a23';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(this.x, this.y, this.w, this.h);
+    }
+    if (performance.now() < this.slowUntil) {
+      ctx.fillStyle = 'rgba(80,180,255,0.35)';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
+
+    const barW = this.w;
+    const barH = 6;
+    const hpPct = Math.max(this.hp / this.maxHp, 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(this.x, this.y - 10, barW, barH);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(this.x, this.y - 10, barW * hpPct, barH);
+  }
+}
+
+class RedQueen {
+  constructor() {
+    // Rainha Vermelha: 2x o tamanho de um herói comum, ataca à distância e invoca zumbis
+    this.w = 38 * 2;
+    this.h = 58 * 2;
+    this.x = Math.round(W * 0.68) - Math.round(this.w / 2);
+    this.y = GROUND_Y - this.h;
+    this.maxHp = 2500;
+    this.hp = this.maxHp;
+    this.dmg = 60;
+    this.alive = true;
+    this.atkTimer = 0;
+    this.atkCooldown = 1.2;
+    this.atkRange = 30;
+    this.speed = 18; // bem lento
+    this.summonInterval = 1.8; // velocidade de invocação reduzida em 20%
+    this.summonTimer = this.summonInterval;
+    this.slowUntil = 0;
+    this.slowFactor = 1;
+
+    // animação sprite
+    this.animState = 'idle';
+    this.animFrame = 0;
+    this.animTimer = 0;
+    this.attackFlashUntil = 0;
+    this.summonFlashUntil = 0;
+    this.deathPlaying = false;
+    this.deathDone = false;
+
+    // Já nasce com 6 zumbis na sua frente, protegendo-a
+    let spawnX = this.x - 10;
+    for (let i = 0; i < 6; i++) {
+      const z = new ZombieEnemy(spawnX);
+      enemies.push(z);
+      spawnX -= (z.w + 4);
+    }
+  }
+
+  applySlow(durationMs, factor = 0.4) {
+    this.slowUntil = performance.now() + durationMs;
+    this.slowFactor = factor;
+  }
+
+  getEffectiveSpeed() {
+    return (performance.now() < this.slowUntil) ? this.speed * this.slowFactor : this.speed;
+  }
+
+  advanceAnim(dt, state) {
+    if (this.animState !== state) {
+      this.animState = state;
+      this.animFrame = 0;
+      this.animTimer = 0;
+    }
+    this.animTimer += dt;
+    const dur = RQ_DURATIONS[state];
+    const count = RQ_FRAMES[state].length;
+    if (this.animTimer >= dur) {
+      this.animTimer -= dur;
+      this.animFrame = (this.animFrame + 1) % count;
+    }
+  }
+
+  update(dt) {
+    // animação de morte: toca até o fim e some
+    if (this.deathPlaying) {
+      this.animTimer += dt;
+      if (this.animTimer >= RQ_DURATIONS.death) {
+        this.animTimer -= RQ_DURATIONS.death;
+        this.animFrame++;
+        if (this.animFrame >= RQ_FRAMES.death.length) {
+          this.animFrame = RQ_FRAMES.death.length - 1;
+          this.deathDone = true;
+        }
+      }
+      return;
+    }
+    if (!this.alive) return;
+    if (performance.now() < (this.paralyzedUntil || 0)) return; // Tríplice Sagrada: paralisado
+
+    const now = performance.now();
+    const inAttackAnim = now < this.attackFlashUntil;
+    const inSummonAnim = now < this.summonFlashUntil;
+
+    // Invoca um zumbi a cada intervalo, sempre atrás da linha de zumbis (na frente dela)
+    this.summonTimer -= dt;
+    if (this.summonTimer <= 0) {
+      this.summonTimer = this.summonInterval;
+      let spawnX = this.x - 10;
+      for (const e of enemies) {
+        if (e.alive && e instanceof ZombieEnemy && e.x < spawnX) spawnX = e.x;
+      }
+      enemies.push(new ZombieEnemy(spawnX - 26));
+      this.summonFlashUntil = now + 450;
+    }
+
+    const target = this.findTarget();
+    if (target) {
+      this.atkTimer -= dt;
+      if (this.atkTimer <= 0) {
+        this.atkTimer = this.atkCooldown;
+        projectiles.push(new Projectile(
+          this.x, this.y + this.h / 2,
+          target, this.dmg, '#c0392b'
+        ));
+        this.attackFlashUntil = now + 350;
+      }
+      if (now < this.attackFlashUntil) {
+        this.advanceAnim(dt, 'attack');
+      } else if (now < this.summonFlashUntil) {
+        this.advanceAnim(dt, 'summon');
+      } else {
+        this.advanceAnim(dt, 'idle');
+      }
+    } else {
+      this.x -= this.getEffectiveSpeed() * dt;
+      if (now < this.summonFlashUntil) {
+        this.advanceAnim(dt, 'summon');
+      } else {
+        this.advanceAnim(dt, 'walk');
+      }
+    }
+  }
+
+  findTarget() {
+    let closest = null;
+    let closestDist = Infinity;
+    for (const h of heroes) {
+      if (!h.alive) continue;
+      const dist = this.x - (h.x + h.w);
+      if (dist <= this.atkRange && dist > -this.w) {
+        if (Math.abs(dist) < closestDist) {
+          closestDist = Math.abs(dist);
+          closest = h;
+        }
+      }
+    }
+    return closest;
+  }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (this.hp <= 0 && this.alive) {
+      this.alive = false;
+      this.deathPlaying = true;
+      this.animState = 'death';
+      this.animFrame = 0;
+      this.animTimer = 0;
+    }
+  }
+
+  draw() {
+    // animação de morte (toca mesmo com alive=false)
+    if (this.deathPlaying) {
+      const key = RQ_FRAMES.death[Math.min(this.animFrame, RQ_FRAMES.death.length - 1)];
+      const img = RQ_SPRITES[key];
+      if (img && img.naturalWidth > 0) {
+        const dh = this.h * 0.65;
+        const dw = img.naturalWidth * (dh / img.naturalHeight);
+        const dx = this.x + (this.w - dw) / 2;
+        const dy = this.y + this.h - dh;
+        ctx.drawImage(img, dx, dy, dw, dh);
+      }
+      if (this.deathDone) this._removed = true;
+      return;
+    }
+    if (!this.alive) return;
+
+    if (performance.now() < (this.paralyzedUntil || 0)) {
+      ctx.strokeStyle = 'rgba(255,235,150,0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#fff7c2';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡', this.x + this.w / 2, this.y - 6);
+      ctx.textAlign = 'left';
+    }
+
+    // sprite animada (espelhada: de frente para a esquerda, em direção aos heróis)
+    const state = this.animState || 'idle';
+    const frames = RQ_FRAMES[state] || RQ_FRAMES.idle;
+    const key = frames[Math.min(this.animFrame, frames.length - 1)];
+    const img = RQ_SPRITES[key];
+    if (img && img.naturalWidth > 0) {
+      const drawH = this.h;
+      const drawW = img.naturalWidth * (drawH / img.naturalHeight);
+      const offX = (this.w - drawW) / 2;
+      ctx.save();
+      ctx.translate(this.x + this.w - offX, this.y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0, drawW, drawH);
+      ctx.restore();
+    }
+
+    if (performance.now() < this.slowUntil) {
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = 'rgba(80,180,255,1)';
+      ctx.beginPath();
+      ctx.ellipse(this.x + this.w / 2, this.y + this.h / 2, this.w * 0.55, this.h * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    const barW = this.w;
+    const barH = 14;
+    const hpPct = Math.max(this.hp / this.maxHp, 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(this.x, this.y - 22, barW, barH);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(this.x, this.y - 22, barW * hpPct, barH);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.x, this.y - 22, barW, barH);
+  }
+}
+
+class SoulReaper {
+  constructor(spawnIndex) {
+    // Ceifador de Almas: forte contra heróis de alvo único e muita vida,
+    // mas seu Escudo de Almas se esgota rápido contra ataques rápidos em horda (ex: Guardas)
+    this.w = 45 * 3.2;
+    this.h = 65 * 3.2;
+    const _srIsBack = (spawnIndex || 0) % 2 === 1;
+    this.rowOffsetY = _srIsBack ? -40 : 0;
+    this._targetX = Math.round(W * 0.68) - Math.round(this.w / 2) + (_srIsBack ? -60 : 0);
+    this.x = W + this.w + 20;
+    this.y = GROUND_Y - this.h + this.rowOffsetY;
+    this.maxHp = 150;
+    this.hp = this.maxHp;
+    this.alive = true;
+    this.atkTimer = 0;
+    this.atkCooldown = 1.2;
+    this.atkRange = 30;
+    this.speed = 35;
+    this.soulShield = 15; // cargas do escudo: cada hit recebido consome 1 carga, ignorando o dano bruto até zerar
+    this.slowUntil = 0;
+    this.slowFactor = 1;
+    // animação sprite
+    this.animState = 'idle';
+    this.animFrame = 0;
+    this.animTimer = 0;
+    this.deathPlaying = false;
+    this.deathDone = false;
+  }
+
+  applySlow(durationMs, factor = 0.4) {
+    this.slowUntil = performance.now() + durationMs;
+    this.slowFactor = factor;
+  }
+
+  getEffectiveSpeed() {
+    return (performance.now() < this.slowUntil) ? this.speed * this.slowFactor : this.speed;
+  }
+
+  advanceAnim(dt, state) {
+    if (this.animState !== state) {
+      this.animState = state;
+      this.animFrame = 0;
+      this.animTimer = 0;
+    }
+    this.animTimer += dt;
+    const dur = REAPER_DURATIONS[state];
+    const count = REAPER_COUNTS[state];
+    if (this.animTimer >= dur) {
+      this.animTimer -= dur;
+      this.animFrame = (this.animFrame + 1) % count;
+    }
+  }
+
+  update(dt) {
+    // animação de morte: toca até o fim e some
+    if (this.deathPlaying) {
+      this.animTimer += dt;
+      if (this.animTimer >= REAPER_DURATIONS.death) {
+        this.animTimer -= REAPER_DURATIONS.death;
+        this.animFrame++;
+        if (this.animFrame >= REAPER_COUNTS.death) {
+          this.deathDone = true;
+        }
+      }
+      return;
+    }
+    if (!this.alive) return;
+    if (performance.now() < (this.paralyzedUntil || 0)) return;
+    const targets = this.findTargets();
+
+    if (targets.length > 0) {
+      this.advanceAnim(dt, 'attack');
+      this.atkTimer -= dt;
+      if (this.atkTimer <= 0) {
+        this.atkTimer = this.atkCooldown;
+        const target = targets[0];
+        const dmg = 15 + target.maxHp * 0.25;
+        target.takeDamage(dmg);
+      }
+    } else {
+      this.advanceAnim(dt, 'walk');
+      const _srSpd = this.getEffectiveSpeed();
+      if (this.x > (this._targetX || 0) + this.w * 0.5) {
+        this.x -= Math.max(_srSpd, 120) * dt;
+      } else {
+        this.x -= _srSpd * dt;
+      }
+    }
+  }
+
+  findTargets() {
+    return heroes
+      .filter(h => {
+        if (!h.alive) return false;
+        if (h.isFlying || h.inCombo) return false; // corpo a corpo não alcança heróis voando ou em combo
+        const dist = this.x - (h.x + h.w);
+        return dist <= this.atkRange && dist > -this.w;
+      })
+      .sort((a, b) => (this.x - (a.x + a.w)) - (this.x - (b.x + b.w)));
+  }
+
+  takeDamage(amount) {
+    if (this.soulShield > 0) {
+      this.soulShield -= 1;
+      this.advanceAnim(0, 'hit');
+      return;
+    }
+    this.hp -= amount;
+    if (this.hp <= 0) {
+      this.alive = false;
+      this.deathPlaying = true;
+      this.animState = 'death';
+      this.animFrame = 0;
+      this.animTimer = 0;
+    } else {
+      this.advanceAnim(0, 'hit');
+    }
+  }
+
+  draw() {
+    // animação de morte (toca mesmo com alive=false)
+    if (this.deathPlaying && !this.deathDone) {
+      const img = REAPER_SPRITES.death;
+      const frame = Math.min(this.animFrame, REAPER_COUNTS.death - 1);
+      const sx = frame * REAPER_FW_DEATH;
+      // desenha deitado centralizado na posição do inimigo
+      const dw = this.w * 2.2;
+      const dh = this.h * 0.7;
+      ctx.save();
+      ctx.translate(this.x + this.w, this.y + this.h * 0.5);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, sx, 0, REAPER_FW_DEATH, REAPER_FH_DEATH, 0, 0, dw, dh);
+      ctx.restore();
+      return;
+    }
+    if (!this.alive) return;
+
+    // efeito de paralisação
+    if (performance.now() < (this.paralyzedUntil || 0)) {
+      ctx.strokeStyle = 'rgba(255,235,150,0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x + this.w / 2, this.y + this.h / 2, this.w * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#fff7c2';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡', this.x + this.w / 2, this.y - 6);
+      ctx.textAlign = 'left';
+    }
+
+
+
+    // sprite animada (espelhada: caminha para a esquerda)
+    const state = this.animState || 'idle';
+    const img = REAPER_SPRITES[state];
+    const fw = state === 'death' ? REAPER_FW_DEATH : REAPER_FW;
+    const fh = state === 'death' ? REAPER_FH_DEATH : REAPER_FH;
+    const frame = Math.min(this.animFrame, REAPER_COUNTS[state] - 1);
+    const sx = frame * fw;
+    // Mantém proporção do sprite (quadrado 130x130) usando a altura como referência
+    const _rDrawH = this.h;
+    const _rDrawW = fw * (_rDrawH / fh); // proporcional
+    const _rOffX = (this.w - _rDrawW) / 2; // centraliza horizontalmente
+    ctx.save();
+    ctx.translate(this.x + this.w - _rOffX, this.y);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, sx, 0, fw, fh, 0, 0, _rDrawW, _rDrawH);
+    ctx.restore();
+
+    // overlay de slow (círculo translúcido)
+    if (performance.now() < this.slowUntil) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = 'rgba(80,180,255,1)';
+      ctx.beginPath();
+      ctx.ellipse(this.x + this.w/2, this.y + this.h/2, this.w*0.55, this.h*0.55, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // contagem de cargas do escudo
+    if (this.soulShield > 0) {
+      ctx.fillStyle = '#00ffff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`🛡️ ${this.soulShield}`, this.x + this.w / 2, this.y - 28);
+      ctx.textAlign = 'left';
+    }
+
+    // barra de vida
+    const barW = this.w;
+    const barH = 10;
+    const hpPct = Math.max(this.hp / this.maxHp, 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(this.x, this.y - 16, barW, barH);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(this.x, this.y - 16, barW * hpPct, barH);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.x, this.y - 16, barW, barH);
+  }
+}
+
+// Efeito visual transitório de queda de pedras ao morrer o Gigante de Pedra
+let rockBursts = [];
+function drawRockBursts() {
+  const now = performance.now();
+  rockBursts = rockBursts.filter(b => now < b.until);
+  for (const b of rockBursts) {
+    const t = 1 - (b.until - now) / 400;
+    ctx.strokeStyle = `rgba(150,150,150,${0.7 * (1 - t)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.radius * t, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+class Projectile {
+  constructor(x, y, target, dmg, color, slowConfig = null) {
+    this.x = x;
+    this.y = y;
+    this.target = target;
+    this.dmg = dmg;
+    this.color = color;
+    this.speed = 400;
+    this.alive = true;
+    this.slowConfig = slowConfig; // { factor, duration } — usado pelo mago
+  }
+
+  update(dt) {
+    if (!this.target.alive) { this.alive = false; return; }
+    const targetX = this.target.x + this.target.w / 2;
+    const targetY = this.target.y + this.target.h / 2;
+    const dx = targetX - this.x;
+    const dy = targetY - this.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 10) {
+      this.target.takeDamage(this.dmg);
+      if (this.slowConfig && typeof this.target.applySlow === 'function') {
+        this.target.applySlow(this.slowConfig.duration, this.slowConfig.factor);
+      }
+      this.alive = false;
+      return;
+    }
+    this.x += (dx / dist) * this.speed * dt;
+    this.y += (dy / dist) * this.speed * dt;
+  }
+
+  draw() {
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ---------- Sistema de Fases e Ondas ----------
+let phase = 1;        // fase atual (1 = gigantes, 2 = dragões, ...)
+let wave = 0;          // onda atual dentro da fase (0 = ainda não começou)
+let spawnQueue = [];    // timestamps (ms) de quando spawnar cada inimigo desta onda
+let waveActive = false; // true enquanto ainda há inimigos para spawnar ou vivos
+
+// ---------- Tríplice Sagrada (combo Mago + Bruxa + Feiticeira) ----------
+const TRIPLE_COMBO_DURATION = 5;   // segundos
+const TRIPLE_COMBO_TICK = 0.5;     // intervalo do jato contínuo
+const TRIPLE_COMBO_MAX_TARGETS = 3;
+let tripleComboActive = false;
+let tripleComboUsedInPhase = false;
+let tripleComboHeroes = [];
+let tripleComboTimer = 0;
+let tripleComboTickTimer = 0;
+let tripleComboCenterX = 0;
+let tripleComboSkyY = 60;
+let tripleComboBannerUntil = 0;
+let tripleComboBeamTargets = []; // inimigos atingidos no tick atual (para desenhar o raio)
+
+function checkTripleComboTrigger() {
+  if (tripleComboActive || tripleComboUsedInPhase) return;
+  const mage = heroes.find(h => h.alive && h.type === 'mage');
+  const witch = heroes.find(h => h.alive && h.type === 'witch');
+  const sorceress = heroes.find(h => h.alive && h.type === 'sorceress');
+  if (mage && witch && sorceress) {
+    activateTripleCombo(mage, witch, sorceress);
+  }
+}
+
+function activateTripleCombo(mage, witch, sorceress) {
+  tripleComboActive = true;
+  tripleComboUsedInPhase = true;
+  tripleComboHeroes = [mage, witch, sorceress];
+  tripleComboTimer = TRIPLE_COMBO_DURATION;
+  tripleComboTickTimer = 0; // primeiro tick dispara quase imediatamente
+  tripleComboCenterX = (mage.x + witch.x + sorceress.x) / 3;
+  tripleComboBannerUntil = performance.now() + 2200;
+
+  for (const h of tripleComboHeroes) {
+    h.inCombo = true;
+    h.comboReturnX = h.x;
+    h.comboReturnY = h.y;
+  }
+}
+
+function updateTripleCombo(dt) {
+  checkTripleComboTrigger();
+  if (!tripleComboActive) return;
+
+  // Anima os três heróis convergindo para um ponto de luz flutuante no céu
+  for (const h of tripleComboHeroes) {
+    const targetX = tripleComboCenterX + (h.w / 2);
+    const targetY = tripleComboSkyY;
+    h.x += (targetX - h.x) * Math.min(1, dt * 6);
+    h.y += (targetY - h.y) * Math.min(1, dt * 6);
+  }
+
+  tripleComboTimer -= dt;
+  tripleComboTickTimer -= dt;
+  if (tripleComboTickTimer <= 0) {
+    tripleComboTickTimer = TRIPLE_COMBO_TICK;
+    fireTripleComboBeam();
+  }
+
+  if (tripleComboTimer <= 0) {
+    endTripleCombo();
+  }
+}
+
+function fireTripleComboBeam() {
+  const [mage, witch, sorceress] = tripleComboHeroes;
+  const totalDmg = (mage.dmg + witch.dmg + sorceress.dmg) * 1.2;
+
+  // Atinge até 3 inimigos de uma vez, priorizando os mais próximos dos heróis
+  const targets = enemies
+    .filter(e => e.alive)
+    .sort((a, b) => a.x - b.x)
+    .slice(0, TRIPLE_COMBO_MAX_TARGETS);
+
+  const paralyzeUntil = performance.now() + (TRIPLE_COMBO_TICK * 1000 + 150);
+  for (const e of targets) {
+    e.takeDamage(totalDmg);
+    e.paralyzedUntil = paralyzeUntil;
+  }
+  tripleComboBeamTargets = targets;
+}
+
+function endTripleCombo() {
+  tripleComboActive = false;
+  tripleComboBeamTargets = [];
+  for (const h of tripleComboHeroes) {
+    h.inCombo = false;
+    if (h.alive) {
+      h.x = h.comboReturnX;
+      h.y = h.comboReturnY;
+      h.atkTimer = 0;
+    }
+  }
+  tripleComboHeroes = [];
+}
+
+function resetTripleComboForNewPhase() {
+  tripleComboUsedInPhase = false;
+}
+
+// ---------- Estado customizado da Fase 1 ----------
+// A fase 1 tem lógica própria de gatilhos, separada do sistema genérico de ondas.
+// onda 1: 6 zumbis, 1s de intervalo
+// onda 2: 1 orc, nasce quando o último zumbi morrer
+// onda 3: 6 zumbis, 1s de intervalo, nascem quando o orc tiver <= 100 HP
+let phase1OrcRef = null;       // referência ao orc da onda 2
+let phase1Wave2Triggered = false; // orc já foi agendado?
+let phase1Wave3Triggered = false; // onda 3 de zumbis já foi agendada?
+
+function resetPhase1State() {
+  phase1OrcRef = null;
+  phase1Wave2Triggered = false;
+  phase1Wave3Triggered = false;
+}
+
+function startNextWave(now) {
+  wave++;
+  spawnQueue = [];
+
+  // Fase 1: onda 1 agenda 6 zumbis com tipo explícito
+  if (phase === 1) {
+    if (wave === 1) {
+      for (let i = 0; i < 6; i++) {
+        spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
+      }
+    }
+    // ondas 2 e 3 são disparadas por gatilho no game loop
+    waveActive = true;
+    return;
+  }
+
+  const count = phase === 5 ? 1 : Math.min(wave, 3);
+  for (let i = 0; i < count; i++) {
+    spawnQueue.push({ time: now + i * 2000, type: 'enemy' });
+  }
+  waveActive = true;
+}
+
+function spawnEnemyForPhase() {
+  // Conta quantos inimigos já existem para alternar a fileira
+  const enemyIndex = enemies.filter(e => e.alive).length;
+
+  // Fase 1, Ondas 1 e 3: spawna ZombieEnemy
+  if (phase === 1 && (wave === 1 || wave === 3)) {
+    const z = new ZombieEnemy(W + 20, enemyIndex);
+    z.speed = 55;
+    enemies.push(z);
+    return;
+  }
+
+  if (phase === 1) {
+    enemies.push(new Enemy(enemyIndex));
+  } else if (phase === 2) {
+    enemies.push(new Dragon(enemyIndex));
+  } else if (phase === 3) {
+    enemies.push(new StoneGiant(enemyIndex));
+  } else if (phase === 4) {
+    enemies.push(new SoulReaper(enemyIndex));
+  } else if (phase === 5) {
+    enemies.push(new RedQueen());
+  } else {
+    enemies.push(new RedQueen());
+  }
+}
+
+// Chamada no início
+startNextWave(performance.now());
+
+let phaseBannerText = null;
+let phaseBannerUntil = 0;
+
+function showPhaseBanner(newPhase) {
+  phaseBannerText = `Fase ${newPhase}!`;
+  phaseBannerUntil = performance.now() + 2500;
+}
+
+// ---------- Sistema de Mão + Fila (Deck) ----------
+// Regra: exatamente 1 de cada carta no deck inteiro (mão + fila)
+const HAND_SIZE = 4;
+const QUEUE_VISIBLE = 3;
+
+const HERO_META = {
+  warrior: { icon: '⚔️',  name: 'Guerreiro' },
+  archer:  { icon: '🏹',  name: 'Arqueiro'  },
+  mage:    { icon: '🔮',  name: 'Mago'      },
+  witch:   { icon: '🧙‍♀️', name: 'Bruxa'     },
+  paladin: { icon: '🛡️', name: 'Paladina'  },
+  sorceress: { icon: '🪄', name: 'Feiticeira' },
+  zombie:  { icon: '🧟',  name: 'Zumbi'     }, // invocado pela bruxa
+  guard:   { icon: '🪖',  name: 'Guarda'    },
+  healer:  { icon: '💛',  name: 'Curandeiro'},
+  knight:  { icon: '🛡️',  name: 'Cavaleiro' },
+  druid:   { icon: '🌿',  name: 'Druida'    },
+};
+
+let PLAYABLE_TYPES = ['warrior', 'archer', 'mage', 'witch', 'guard', 'healer', 'knight'];
+
+// ---------- Tela de Seleção de Heróis (menu) ----------
+// Cartas disponíveis além dos 7 escolhidos para batalha
+let OTHER_TYPES = ['druid', 'paladin', 'sorceress'];
+let heroChoiceSelected = null;   // type da carta "outras" atualmente selecionada (mostrando botão "Escolher")
+let teamSlotPicking = null;      // type da carta nova aguardando escolha de qual slot do time vai sair
+
+function renderHeroesScreen() {
+  const selectedGrid = document.getElementById('selectedHeroesGrid');
+  const otherGrid = document.getElementById('otherHeroesGrid');
+
+  // --- Heróis escolhidos para batalha ---
+  selectedGrid.innerHTML = '';
+  PLAYABLE_TYPES.forEach(type => {
+    const def = HERO_TYPES[type];
+    const meta = HERO_META[type];
+    const div = document.createElement('div');
+    const pickMode = teamSlotPicking !== null;
+    div.className = `heroCardBig ${type} inTeam${pickMode ? ' pickable' : ''}`;
+    div.innerHTML = `
+      <div class="cost">${def.cost}</div>
+      <div class="icon">${meta.icon}</div>
+      <div class="name">${meta.name}</div>
+    `;
+    if (pickMode) {
+      div.addEventListener('click', () => swapHeroIntoTeam(type));
+    }
+    selectedGrid.appendChild(div);
+  });
+
+  // --- Outras cartas (ainda não desbloqueadas / não escolhidas) ---
+  otherGrid.innerHTML = '';
+  if (OTHER_TYPES.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'heroCardBig empty';
+    empty.innerHTML = `
+      <div class="icon">➕</div>
+      <div class="name">Nenhuma carta</div>
+    `;
+    otherGrid.appendChild(empty);
+  } else {
+    OTHER_TYPES.forEach(type => {
+      const def = HERO_TYPES[type];
+      const meta = HERO_META[type];
+      const div = document.createElement('div');
+      const isSelected = heroChoiceSelected === type;
+      div.className = `heroCardBig ${type}${isSelected ? ' selectedForChoice' : ''}`;
+      div.innerHTML = `
+        <div class="cost">${def.cost}</div>
+        <div class="icon">${meta.icon}</div>
+        <div class="name">${meta.name}</div>
+        ${isSelected ? '<button class="chooseBtn">Escolher</button>' : ''}
+      `;
+      div.addEventListener('click', (e) => {
+        if (e.target.classList.contains('chooseBtn')) return;
+        heroChoiceSelected = isSelected ? null : type;
+        teamSlotPicking = null;
+        renderHeroesScreen();
+      });
+      if (isSelected) {
+        div.querySelector('.chooseBtn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          chooseHeroCard(type);
+        });
+      }
+      otherGrid.appendChild(div);
+    });
+  }
+
+  const hint = document.getElementById('heroesHint');
+  if (hint) {
+    hint.textContent = teamSlotPicking
+      ? `Toque em uma carta do time acima para trocar por ${HERO_META[teamSlotPicking].name}`
+      : '';
+  }
+}
+
+function chooseHeroCard(type) {
+  // Pede para o jogador escolher qual carta do time vai sair para entrar a nova
+  heroChoiceSelected = null;
+  teamSlotPicking = type;
+  renderHeroesScreen();
+}
+
+function swapHeroIntoTeam(outgoingType) {
+  const incomingType = teamSlotPicking;
+  if (!incomingType) return;
+  const idx = PLAYABLE_TYPES.indexOf(outgoingType);
+  if (idx === -1) return;
+
+  PLAYABLE_TYPES[idx] = incomingType;
+  OTHER_TYPES = OTHER_TYPES.filter(t => t !== incomingType);
+  OTHER_TYPES.push(outgoingType);
+
+  teamSlotPicking = null;
+  renderHeroesScreen();
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Deck = exatamente as 7 cartas, embaralhadas. Mão = primeiras 4, fila = últimas 3.
+let deck = shuffle(Object.keys(HERO_TYPES));
+let hand = [];
+
+function initHand() {
+  deck = shuffle([...PLAYABLE_TYPES]); // 7 cartas únicas jogáveis
+  hand = deck.splice(0, HAND_SIZE);        // 4 na mão, 3 ficam na fila
+  renderCards();
+}
+
+let selectedHandIndex = null;
+const placementHint = document.getElementById('placementHint');
+
+function selectCard(i) {
+  const type = hand[i];
+  const def = HERO_TYPES[type];
+  if (energy < def.cost) return;
+  selectedHandIndex = (selectedHandIndex === i) ? null : i;
+  canvas.classList.toggle('placing', selectedHandIndex !== null);
+  placementHint.style.display = selectedHandIndex !== null ? 'block' : 'none';
+  renderCards();
+}
+
+function spawnHeroAt(type, clickX) {
+  const def = HERO_TYPES[type];
+  if (def.spawnCount && def.spawnCount > 1) {
+    const totalW = def.spawnCount * def.w + (def.spawnCount - 1) * 6;
+    let startX = clickX - totalW / 2;
+    startX = Math.max(10, Math.min(startX, W - totalW - 10));
+    for (let i = 0; i < def.spawnCount; i++) {
+      heroes.push(new Hero(type, startX + i * (def.w + 6)));
+    }
+  } else {
+    let x = clickX - def.w / 2;
+    x = Math.max(10, Math.min(x, W - def.w - 10));
+    heroes.push(new Hero(type, x));
+  }
+}
+
+function playCard(handIndex, clickX) {
+  const type = hand[handIndex];
+  const def = HERO_TYPES[type];
+  if (energy < def.cost) return;
+
+  energy -= def.cost;
+
+  // Invoca o herói na posição escolhida (sempre no chão; nenhum herói voa)
+  spawnHeroAt(type, clickX !== undefined ? clickX : 30 + def.w / 2);
+
+  // Próxima carta da fila entra na mão (a que estava na frente da fila)
+  hand[handIndex] = deck.shift();
+
+  // Carta jogada vai sempre para o final da fila (estilo Clash Royale)
+  deck.push(type);
+
+  updateEnergyUI();
+  renderCards();
+}
+
+// Clique/toque no campo de batalha: posiciona o herói da carta selecionada
+canvas.addEventListener('click', (e) => {
+  if (selectedHandIndex === null) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const clickX = (e.clientX - rect.left) * scaleX;
+  const idx = selectedHandIndex;
+  selectedHandIndex = null;
+  canvas.classList.remove('placing');
+  placementHint.style.display = 'none';
+  playCard(idx, clickX);
+});
+
+function renderCards() {
+  const handEl = document.getElementById('hand');
+  const queueEl = document.getElementById('queue');
+
+  // --- Mão ---
+  handEl.innerHTML = '';
+  hand.forEach((type, i) => {
+    const def = HERO_TYPES[type];
+    const meta = HERO_META[type];
+    const div = document.createElement('div');
+    div.className = `card ${type}${energy < def.cost ? ' disabled' : ''}${selectedHandIndex === i ? ' selected' : ''}`;
+    div.innerHTML = `
+      <div class="cost">${def.cost}</div>
+      <div class="icon">${meta.icon}</div>
+      <div class="name">${meta.name}</div>
+    `;
+    div.addEventListener('click', () => selectCard(i));
+    handEl.appendChild(div);
+  });
+
+  // --- Fila (as 3 cartas restantes) ---
+  queueEl.innerHTML = '';
+  deck.forEach(type => {
+    const def = HERO_TYPES[type];
+    const meta = HERO_META[type];
+    const div = document.createElement('div');
+    div.className = `qcard ${type}`;
+    div.innerHTML = `
+      <div class="cost">${def.cost}</div>
+      <div class="icon">${meta.icon}</div>
+    `;
+    queueEl.appendChild(div);
+  });
+}
+
+function updateCardStates() {
+  renderCards();
+}
+
+initHand();
+
+// ---------- Game Over ----------
+let gameOver = false;
+const gameOverScreen = document.getElementById('gameOverScreen');
+const restartBtn = document.getElementById('restartBtn');
+
+function triggerGameOver() {
+  gameOver = true;
+  gameOverScreen.style.display = 'flex';
+}
+
+restartBtn.addEventListener('click', () => {
+  heroes = [];
+  enemies = [];
+  projectiles = [];
+  rockBursts = [];
+  energy = 4;
+  enemyDeadSince = null;
+  phase = 1;
+  wave = 0;
+  spawnQueue = [];
+  phaseBannerText = null;
+  gameOver = false;
+  selectedHandIndex = null;
+  tripleComboActive = false;
+  tripleComboUsedInPhase = false;
+  tripleComboHeroes = [];
+  tripleComboBeamTargets = [];
+  tripleComboBannerUntil = 0;
+  canvas.classList.remove('placing');
+  placementHint.style.display = 'none';
+  gameOverScreen.style.display = 'none';
+  resetPhase1State();
+  startNextWave(performance.now());
+  initHand();
+  lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+});
+
+const menuBtn2 = document.getElementById('menuBtn2');
+menuBtn2.addEventListener('click', () => {
+  // Volta para a tela inicial sem iniciar uma nova partida (o jogador clica em
+  // "Iniciar" quando quiser jogar de novo)
+  heroes = [];
+  enemies = [];
+  projectiles = [];
+  rockBursts = [];
+  energy = 0;
+  enemyDeadSince = null;
+  phase = 1;
+  wave = 0;
+  spawnQueue = [];
+  phaseBannerText = null;
+  gameOver = false;
+  selectedHandIndex = null;
+  tripleComboActive = false;
+  tripleComboUsedInPhase = false;
+  tripleComboHeroes = [];
+  tripleComboBeamTargets = [];
+  tripleComboBannerUntil = 0;
+  canvas.classList.remove('placing');
+  placementHint.style.display = 'none';
+  gameOverScreen.style.display = 'none';
+  gameContent.style.display = 'none';
+  startScreen.style.display = 'flex';
+});
+
+// ---------- Loop principal ----------
+let lastTime = performance.now();
+let enemyDeadSince = null;
+
+function gameLoop(now) {
+  if (gameOver) return;
+
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  // energia
+  energy = Math.min(MAX_ENERGY, energy + ENERGY_PER_SECOND * dt);
+  updateEnergyUI();
+  updateCardStates();
+
+  // update heróis
+  heroes.forEach(h => h.update(dt));
+  heroes = heroes.filter(h => h.alive);
+
+  // Tríplice Sagrada: detecta e atualiza o combo Mago + Bruxa + Feiticeira
+  updateTripleCombo(dt);
+
+  // update inimigos
+  enemies.forEach(e => e.update(dt));
+
+  // Vitória do orc: ao chegar no objetivo, toca a animação de vitória antes do Game Over
+  const winner = enemies.find(e => e.alive && e.reachedGoal);
+  if (winner) {
+    winner.victoryAnimTimer += dt;
+    draw();
+    const victoryDuration = ORC_FRAME_COUNTS.victory * ORC_FRAME_DURATIONS.victory;
+    if (winner.victoryAnimTimer >= victoryDuration) {
+      triggerGameOver();
+      return;
+    }
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  // Game Over: inimigo (de outro tipo) chegou na borda esquerda
+  if (enemies.some(e => e.alive && e.x <= 0)) {
+    draw();
+    triggerGameOver();
+    return;
+  }
+
+  // ---------- Lógica de ondas ----------
+  // Spawna inimigos agendados — spawnQueue agora armazena { time, type } para fase 1
+  while (spawnQueue.length > 0 && now >= spawnQueue[0].time) {
+    const entry = spawnQueue.shift();
+    if (entry.type === 'zombie') {
+      const z = new ZombieEnemy(W + 20, enemies.length);
+      z.speed = 55;
+      enemies.push(z);
+    } else {
+      spawnEnemyForPhase();
+    }
+  }
+
+  // Gatilhos customizados da Fase 1
+  if (phase === 1) {
+    // Onda 2: orc nasce quando todos os zumbis da onda 1 morrerem (e fila esvaziou)
+    if (wave === 1 && !phase1Wave2Triggered && spawnQueue.length === 0) {
+      const anyZombieAlive = enemies.some(e => e instanceof ZombieEnemy && e.alive);
+      if (!anyZombieAlive) {
+        phase1Wave2Triggered = true;
+        wave = 2;
+        enemyDeadSince = null;
+        const orc = new Enemy(0);
+        enemies.push(orc);
+        phase1OrcRef = orc;
+      }
+    }
+
+    // Onda 3: 6 zumbis nascem quando o orc atingir <= 100 HP
+    if (wave === 2 && !phase1Wave3Triggered && phase1OrcRef && phase1OrcRef.alive) {
+      if (phase1OrcRef.hp <= 100) {
+        phase1Wave3Triggered = true;
+        wave = 3;
+        for (let i = 0; i < 6; i++) {
+          spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
+        }
+      }
+    }
+  }
+
+  // Quando todos morreram e fila esvaziou, iniciar próxima onda (ou próxima fase) após 2s
+  // Na Fase 1 as ondas são controladas pelos gatilhos acima; o sistema genérico só age quando wave === 3 (após onda 3 de zumbis)
+  const anyAlive = enemies.some(e => e.alive);
+  const phase1CustomControl = phase === 1 && wave < 3;
+  if (!anyAlive && spawnQueue.length === 0 && !phase1CustomControl) {
+    if (enemyDeadSince === null) enemyDeadSince = now;
+    if (now - enemyDeadSince > 2000) {
+      enemies = [];
+      if (wave >= 3) {
+        phase++;
+        wave = 0;
+        showPhaseBanner(phase);
+        resetTripleComboForNewPhase();
+        if (phase === 2) resetPhase1State(); // limpa flags da fase 1 ao sair dela
+      }
+      startNextWave(now);
+      enemyDeadSince = null;
+    }
+  } else if (phase1CustomControl) {
+    enemyDeadSince = null;
+  } else {
+    enemyDeadSince = null;
+  }
+
+  // update projéteis
+  projectiles.forEach(p => p.update(dt));
+  projectiles = projectiles.filter(p => p.alive);
+
+  // ---------- desenho ----------
+  draw();
+
+  requestAnimationFrame(gameLoop);
+}
+
+function drawTripleCombo() {
+  if (!tripleComboActive) {
+    // banner de ativação rápido logo após o disparo do combo, mesmo já tendo terminado a animação de convergência
+    if (performance.now() < tripleComboBannerUntil) {
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(0, H / 2 - 40, W, 80);
+      ctx.fillStyle = '#fff3b0';
+      ctx.font = 'bold 36px Arial';
+      ctx.fillText('✨ TRÍPLICE SAGRADA ✨', W / 2, H / 2 + 12);
+      ctx.restore();
+    }
+    return;
+  }
+
+  const lightX = tripleComboCenterX + 18;
+  const lightY = tripleComboSkyY + 25;
+
+  // luz flutuante unindo os três heróis no céu
+  ctx.save();
+  const pulse = 10 + Math.sin(performance.now() / 100) * 5;
+  const glow = ctx.createRadialGradient(lightX, lightY, 5, lightX, lightY, 70 + pulse);
+  glow.addColorStop(0, 'rgba(255,255,255,0.95)');
+  glow.addColorStop(0.5, 'rgba(255,225,140,0.55)');
+  glow.addColorStop(1, 'rgba(255,225,140,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(lightX, lightY, 70 + pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // jato contínuo: raios dourados da luz até cada inimigo atingido no tick atual
+  if (tripleComboBeamTargets.length > 0) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,240,160,0.9)';
+    ctx.lineWidth = 5;
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur = 12;
+    for (const e of tripleComboBeamTargets) {
+      if (!e.alive) continue;
+      ctx.beginPath();
+      ctx.moveTo(lightX, lightY);
+      ctx.lineTo(e.x + e.w / 2, e.y + e.h / 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // banner de texto
+  if (performance.now() < tripleComboBannerUntil) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, H / 2 - 40, W, 80);
+    ctx.fillStyle = '#fff3b0';
+    ctx.font = 'bold 36px Arial';
+    ctx.fillText('✨ TRÍPLICE SAGRADA ✨', W / 2, H / 2 + 12);
+    ctx.restore();
+  }
+
+  // contagem regressiva do combo
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff3b0';
+  ctx.font = 'bold 16px Arial';
+  ctx.fillText(`${Math.max(0, tripleComboTimer).toFixed(1)}s`, lightX, lightY - 80);
+  ctx.restore();
+}
+
+function draw() {
+  // fundo
+  ctx.clearRect(0, 0, W, H);
+
+  if (BG_IMG.complete && BG_IMG.naturalWidth > 0) {
+    ctx.drawImage(BG_IMG, 0, 0, W, H);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#1b2a3a');
+    grad.addColorStop(1, '#3a4f63');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // entidades — ordenadas por Y para que fileira de baixo fique na frente
+  const allEntities = [...enemies, ...heroes].sort((a, b) => (a.y + a.h) - (b.y + b.h));
+  allEntities.forEach(e => e.draw());
+  projectiles.forEach(p => p.draw());
+  drawRockBursts();
+  drawTripleCombo();
+
+  // indicador de fase/onda
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Fase ${phase} - Onda ${wave}`, 12, 22);
+
+  // banner de transição de fase
+  if (phaseBannerText && performance.now() < phaseBannerUntil) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, H / 2 - 40, W, 80);
+    ctx.fillStyle = '#ffcc33';
+    ctx.font = 'bold 36px Arial';
+    ctx.fillText(phaseBannerText, W / 2, H / 2 + 12);
+    ctx.restore();
+  }
+}
+
+// O loop só começa quando o jogador realmente inicia uma partida (ver startBtn/phase5Btn/restartBtn)
+</script>
+
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"f0f03d0605bf45f1a3b17cf7d5e6861f","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"f0f03d0605bf45f1a3b17cf7d5e6861f","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"f0f03d0605bf45f1a3b17cf7d5e6861f","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
