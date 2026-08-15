@@ -1389,24 +1389,8 @@ const spriteCfg = SPRITE_CONFIGS[this.type];
 if (spriteCfg && spriteCfg.sprites[this.animState] && spriteCfg.sprites[this.animState].complete && spriteCfg.sprites[this.animState].naturalWidth > 0) {
   const img = spriteCfg.sprites[this.animState];
   
-  // GUERREIRO: desenha o GIF inteiro sem recortar
-  if (this.type === 'warrior') {
-    const drawH = this.h * 2.0;
-    const drawW = this.w * 2.0;
-    const drawX = this.x + this.w / 2 - drawW / 2;
-    const drawY = (this.y + this.h) - drawH - 10;
-    
-    if (this.facing === -1) {
-      ctx.save();
-      ctx.translate(drawX + drawW, drawY);
-      ctx.scale(-1, 1);
-      ctx.drawImage(img, 0, 0, drawW, drawH);
-      ctx.restore();
-    } else {
-      ctx.drawImage(img, drawX, drawY, drawW, drawH);
-    }
-  } else {
-    // OUTROS HERÓIS: spritesheet normal
+  // Todos os heróis (inclusive guerreiro): spritesheet normal, cortada por frame
+  {
     const count = spriteCfg.counts[this.animState];
     const frame = Math.min(this.animFrame, count - 1);
     const realFrameW = img.naturalWidth / count;
