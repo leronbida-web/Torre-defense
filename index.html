@@ -1797,8 +1797,14 @@ class Dragon {
     }
 
     // sprite de voo (sem espelhamento: gárgula voa para a esquerda corretamente)
-    const sx = this.animFrame * DRAGON_FRAME_W;
-    ctx.drawImage(DRAGON_SPRITE_IMG, sx, 0, DRAGON_FRAME_W, DRAGON_FRAME_H, this.x, this.y, this.w, this.h);
+    if (DRAGON_SPRITE_IMG.complete && DRAGON_SPRITE_IMG.naturalWidth > 0) {
+      const sx = this.animFrame * DRAGON_FRAME_W;
+      ctx.drawImage(DRAGON_SPRITE_IMG, sx, 0, DRAGON_FRAME_W, DRAGON_FRAME_H, this.x, this.y, this.w, this.h);
+    } else {
+      // imagem ainda não carregou (ou falhou) — placeholder simples pra não travar o jogo
+      ctx.fillStyle = '#8b2be2';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
 
     // overlay de slow (círculo translúcido, sem quadrado)
     if (performance.now() < this.slowUntil) {
@@ -1944,10 +1950,15 @@ class StoneGiant {
 
     // sprite de walk (sprite já olha para a esquerda, sem espelhamento)
     const img = GIANT_SPRITES.walk;
-    const frameW = img.naturalWidth  / GIANT_FRAME_COUNTS.walk;
-    const frameH = img.naturalHeight;
-    const sx = this.animFrame * frameW;
-    ctx.drawImage(img, sx, 0, frameW, frameH, this.x, this.y, this.w, this.h);
+    if (img && img.complete && img.naturalWidth > 0) {
+      const frameW = img.naturalWidth  / GIANT_FRAME_COUNTS.walk;
+      const frameH = img.naturalHeight;
+      const sx = this.animFrame * frameW;
+      ctx.drawImage(img, sx, 0, frameW, frameH, this.x, this.y, this.w, this.h);
+    } else {
+      ctx.fillStyle = '#8b4513';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
 
     // overlay de slow (círculo translúcido)
     if (performance.now() < this.slowUntil) {
@@ -2470,16 +2481,18 @@ class SoulReaper {
     // animação de morte (toca mesmo com alive=false)
     if (this.deathPlaying && !this.deathDone) {
       const img = REAPER_SPRITES.death;
-      const frame = Math.min(this.animFrame, REAPER_COUNTS.death - 1);
-      const sx = frame * REAPER_FW_DEATH;
-      // desenha deitado centralizado na posição do inimigo
-      const dw = this.w * 2.2;
-      const dh = this.h * 0.7;
-      ctx.save();
-      ctx.translate(this.x + this.w, this.y + this.h * 0.5);
-      ctx.scale(-1, 1);
-      ctx.drawImage(img, sx, 0, REAPER_FW_DEATH, REAPER_FH_DEATH, 0, 0, dw, dh);
-      ctx.restore();
+      if (img && img.complete && img.naturalWidth > 0) {
+        const frame = Math.min(this.animFrame, REAPER_COUNTS.death - 1);
+        const sx = frame * REAPER_FW_DEATH;
+        // desenha deitado centralizado na posição do inimigo
+        const dw = this.w * 2.2;
+        const dh = this.h * 0.7;
+        ctx.save();
+        ctx.translate(this.x + this.w, this.y + this.h * 0.5);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, sx, 0, REAPER_FW_DEATH, REAPER_FH_DEATH, 0, 0, dw, dh);
+        ctx.restore();
+      }
       return;
     }
     if (!this.alive) return;
@@ -2503,19 +2516,24 @@ class SoulReaper {
     // sprite animada (espelhada: caminha para a esquerda)
     const state = this.animState || 'idle';
     const img = REAPER_SPRITES[state];
-    const fw = state === 'death' ? REAPER_FW_DEATH : REAPER_FW;
-    const fh = state === 'death' ? REAPER_FH_DEATH : REAPER_FH;
-    const frame = Math.min(this.animFrame, REAPER_COUNTS[state] - 1);
-    const sx = frame * fw;
-    // Mantém proporção do sprite (quadrado 130x130) usando a altura como referência
-    const _rDrawH = this.h;
-    const _rDrawW = fw * (_rDrawH / fh); // proporcional
-    const _rOffX = (this.w - _rDrawW) / 2; // centraliza horizontalmente
-    ctx.save();
-    ctx.translate(this.x + this.w - _rOffX, this.y);
-    ctx.scale(-1, 1);
-    ctx.drawImage(img, sx, 0, fw, fh, 0, 0, _rDrawW, _rDrawH);
-    ctx.restore();
+    if (img && img.complete && img.naturalWidth > 0) {
+      const fw = state === 'death' ? REAPER_FW_DEATH : REAPER_FW;
+      const fh = state === 'death' ? REAPER_FH_DEATH : REAPER_FH;
+      const frame = Math.min(this.animFrame, REAPER_COUNTS[state] - 1);
+      const sx = frame * fw;
+      // Mantém proporção do sprite (quadrado 130x130) usando a altura como referência
+      const _rDrawH = this.h;
+      const _rDrawW = fw * (_rDrawH / fh); // proporcional
+      const _rOffX = (this.w - _rDrawW) / 2; // centraliza horizontalmente
+      ctx.save();
+      ctx.translate(this.x + this.w - _rOffX, this.y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, sx, 0, fw, fh, 0, 0, _rDrawW, _rDrawH);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#2f2f2f';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
 
     // overlay de slow (círculo translúcido)
     if (performance.now() < this.slowUntil) {
