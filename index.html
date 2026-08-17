@@ -456,15 +456,15 @@
 <div id="gameWrap">
 <div id="innerStage">
   <div id="gameOverScreen">
-    <h1>GAME OVER</h1>
-    <p>O seu castelo foi invadido!</p>
+    <h1>💀 DERROTA</h1>
+    <p>O gigante destruiu seu castelo!</p>
     <button id="restartBtn" class="menuBtn">↺ Tentar Novamente</button>
-    <button id="menuBtn2" class="menuBtn">Voltar ao Menu</button>
+    <button id="menuBtn2" class="menuBtn">🏠 Voltar ao Menu</button>
   </div>
 
   <div id="startScreen">
-    <h1>Torre defense</h1>
-    <p class="subtitle">Monte seu melhor time para defender o castelo</p>
+    <h1>⚔️ Batalha de Heróis</h1>
+    <p class="subtitle">Convoque heróis e derrote o inimigo gigante</p>
     <button id="startBtn" class="menuBtn">▶ Iniciar</button>
     <div class="phaseShortcuts">
       <span class="phaseShortcutsLabel">Atalhos de fase:</span>
@@ -475,7 +475,7 @@
         <button class="phaseBtn" data-phase="5">Fase 5</button>
       </div>
     </div>
-    <button id="heroesBtn" class="menuBtn">Heróis</button>
+    <button id="heroesBtn" class="menuBtn">🃏 Heróis</button>
     <button id="fullscreenBtn" class="menuBtn">⛶ Tela Cheia</button>
   </div>
 
@@ -640,7 +640,7 @@ WARRIOR_SPRITES.loadAll();
 
 
 const ARCHER_FRAME_W = 48, ARCHER_FRAME_H = 54;
-const ARCHER_FRAME_COUNTS = { idle: 7, walk: 6, attack: 9, hit: 6 };
+const ARCHER_FRAME_COUNTS = { idle: 9, walk: 6, attack: 9, hit: 9 };
 const ARCHER_FRAME_DURATIONS = { idle: 0.24, walk: 0.09, attack: 0.667/9, hit: 0.08 };
 const ARCHER_SPRITES = {
   loadAll() {
