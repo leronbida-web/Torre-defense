@@ -626,13 +626,13 @@ const WARRIOR_FRAME_DURATIONS = { idle: 0.28, walk: 0.09, attack: 0.8/9, hit: 0.
 const WARRIOR_SPRITES = {
   loadAll() {
     this['idle'] = new Image();
-    this['idle'].src = 'warrior_idle.png';
+    this['idle'].src = 'warrior_idle.webp';
     this['walk'] = new Image();
     this['walk'].src = 'warrior_walk.png';
     this['attack'] = new Image();
-    this['attack'].src = 'warrior_attack.png';
+    this['attack'].src = 'warrior_attack.webp';
     this['hit'] = new Image();
-    this['hit'].src = 'warrior_hit.png';
+    this['hit'].src = 'warrior_hit.webp';
   }
 };
 WARRIOR_SPRITES.loadAll();
@@ -645,13 +645,13 @@ const ARCHER_FRAME_DURATIONS = { idle: 0.24, walk: 0.09, attack: 0.667/9, hit: 0
 const ARCHER_SPRITES = {
   loadAll() {
     this['idle'] = new Image();
-    this['idle'].src = 'archer_idle.png';
+    this['idle'].src = 'archer_idle.webp';
     this['walk'] = new Image();
     this['walk'].src = 'archer_walk.png';
     this['attack'] = new Image();
-    this['attack'].src = 'archer_attack.png';
+    this['attack'].src = 'archer_attack.webp';
     this['hit'] = new Image();
-    this['hit'].src = 'archer_hit.png';
+    this['hit'].src = 'archer_hit.webp';
   }
 };
 ARCHER_SPRITES.loadAll();
@@ -678,7 +678,7 @@ ORC_SPRITES.loadAll();
 
 
 const WITCH_FRAME_W = 110, WITCH_FRAME_H = 110;
-const WITCH_FRAME_COUNTS = { idle: 1, walk: 7, attack: 4, hit: 4 };
+const WITCH_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
 const WITCH_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.25, hit: 0.12 };
 const WITCH_SPRITES = {
   loadAll() {
@@ -698,7 +698,7 @@ WITCH_SPRITES.loadAll();
 
 
 const MAGE_FRAME_W = 110, MAGE_FRAME_H = 110;
-const MAGE_FRAME_COUNTS = { idle: 1, walk: 7, attack: 4, hit: 2 };
+const MAGE_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
 const MAGE_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.18, hit: 0.18 };
 const MAGE_SPRITES = {
   loadAll() {
@@ -718,7 +718,7 @@ MAGE_SPRITES.loadAll();
 
 
 const GUARD_FRAME_W = 110, GUARD_FRAME_H = 110;
-const GUARD_FRAME_COUNTS = { idle: 1, walk: 6, attack: 3, hit: 3 };
+const GUARD_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
 const GUARD_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.18, hit: 0.13 };
 const GUARD_SPRITES = {
   loadAll() {
@@ -737,7 +737,7 @@ GUARD_SPRITES.loadAll();
 
 
 const HEALER_FRAME_W = 90, HEALER_FRAME_H = 95;
-const HEALER_FRAME_COUNTS = { idle: 1, walk: 2, attack: 1, hit: 4 };
+const HEALER_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
 const HEALER_FRAME_DURATIONS = { idle: 0.4, walk: 0.22, attack: 0.5, hit: 0.13 };
 const HEALER_SPRITES = {
   loadAll() {
@@ -756,7 +756,7 @@ HEALER_SPRITES.loadAll();
 
 
 const DRUID_FRAME_W = 90, DRUID_FRAME_H = 95;
-const DRUID_FRAME_COUNTS = { idle: 1, walk: 7, attack: 3, hit: 2 };
+const DRUID_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
 const DRUID_FRAME_DURATIONS = { idle: 0.35, walk: 0.1, attack: 0.22, hit: 0.18 };
 const DRUID_SPRITES = {
   loadAll() {
@@ -793,7 +793,7 @@ ZOMBIE_SPRITES.loadAll();
 
 
 const SORCERESS_FRAME_W = 110, SORCERESS_FRAME_H = 110;
-const SORCERESS_FRAME_COUNTS = { idle: 1, walk: 3, attack: 4, hit: 1 };
+const SORCERESS_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
 const SORCERESS_FRAME_DURATIONS = { idle: 0.3, walk: 0.12, attack: 0.18, hit: 0.12 };
 const SORCERESS_SPRITES = {
   loadAll() {
@@ -812,7 +812,7 @@ SORCERESS_SPRITES.loadAll();
 
 
 const PALADIN_FRAME_W = 329, PALADIN_FRAME_H = 300;
-const PALADIN_FRAME_COUNTS = { idle: 1, walk: 3, attack: 3, hit: 2 };
+const PALADIN_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
 const PALADIN_FRAME_DURATIONS = { idle: 0.3, walk: 0.12, attack: 0.18, hit: 0.18 };
 const PALADIN_SPRITES = {
   loadAll() {
@@ -854,7 +854,7 @@ GIANT_SPRITES.loadAll();
 // attack: 22667 → 4 frames, 1019×245 → frameW=254
 // hit:    22669 → 3 frames, 907×275  → frameW=302
 const KNIGHT_FRAME_W = 268, KNIGHT_FRAME_H = 232;
-const KNIGHT_FRAME_COUNTS    = { idle: 1, walk: 4, attack: 4, hit: 3 };
+const KNIGHT_FRAME_COUNTS    = { idle: 4, walk: 9, attack: 9, hit: 4 };
 const KNIGHT_FRAME_DURATIONS = { idle: 0.4, walk: 0.1, attack: 0.15, hit: 0.13 };
 const KNIGHT_SPRITES = {
   loadAll() {
