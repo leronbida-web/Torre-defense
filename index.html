@@ -619,6 +619,32 @@ const BG_IMG = new Image();
 BG_IMG.src = 'https://i.imgur.com/NI1Gr4c.jpeg';
 
 
+// Detecta automaticamente se a imagem é uma fileira única (strip) ou uma grade
+// quadrada (2x2, 3x3, 4x4...). Assim não precisamos reorganizar toda spritesheet
+// manualmente antes de usar no jogo.
+function getFrameRect(img, count, frame) {
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const aspect = W / H;
+  const sqrtCount = Math.sqrt(count);
+  const isSquareCount = Number.isInteger(sqrtCount);
+  // Se a imagem é bem mais larga que alta (aspecto grande), é fileira única.
+  // Se está próxima de um quadrado E a contagem é um quadrado perfeito (4, 9, 16...), é grade.
+  const isGrid = isSquareCount && aspect < sqrtCount * 0.6;
+  if (isGrid) {
+    const cols = sqrtCount;
+    const rows = Math.ceil(count / cols);
+    const frameW = W / cols;
+    const frameH = H / rows;
+    const col = frame % cols;
+    const row = Math.floor(frame / cols);
+    return { sx: col * frameW, sy: row * frameH, frameW, frameH };
+  } else {
+    const frameW = W / count;
+    const frameH = H;
+    return { sx: frame * frameW, sy: 0, frameW, frameH };
+  }
+}
+
 // ---------- Sprites do Guerreiro (geradas a partir das sprite sheets enviadas) ----------
 const WARRIOR_FRAME_W = 90, WARRIOR_FRAME_H = 95;
 const WARRIOR_FRAME_COUNTS = { idle: 3, walk: 6, attack: 9, hit: 1 };
@@ -678,7 +704,7 @@ ORC_SPRITES.loadAll();
 
 
 const WITCH_FRAME_W = 110, WITCH_FRAME_H = 110;
-const WITCH_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
+const WITCH_FRAME_COUNTS = { idle: 9, walk: 16, attack: 16, hit: 9 };
 const WITCH_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.25, hit: 0.12 };
 const WITCH_SPRITES = {
   loadAll() {
@@ -698,7 +724,7 @@ WITCH_SPRITES.loadAll();
 
 
 const MAGE_FRAME_W = 110, MAGE_FRAME_H = 110;
-const MAGE_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
+const MAGE_FRAME_COUNTS = { idle: 9, walk: 16, attack: 16, hit: 9 };
 const MAGE_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.18, hit: 0.18 };
 const MAGE_SPRITES = {
   loadAll() {
@@ -718,7 +744,7 @@ MAGE_SPRITES.loadAll();
 
 
 const GUARD_FRAME_W = 110, GUARD_FRAME_H = 110;
-const GUARD_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
+const GUARD_FRAME_COUNTS = { idle: 9, walk: 16, attack: 16, hit: 9 };
 const GUARD_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.18, hit: 0.13 };
 const GUARD_SPRITES = {
   loadAll() {
@@ -737,7 +763,7 @@ GUARD_SPRITES.loadAll();
 
 
 const HEALER_FRAME_W = 90, HEALER_FRAME_H = 95;
-const HEALER_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
+const HEALER_FRAME_COUNTS = { idle: 9, walk: 16, attack: 16, hit: 9 };
 const HEALER_FRAME_DURATIONS = { idle: 0.4, walk: 0.22, attack: 0.5, hit: 0.13 };
 const HEALER_SPRITES = {
   loadAll() {
@@ -756,7 +782,7 @@ HEALER_SPRITES.loadAll();
 
 
 const DRUID_FRAME_W = 90, DRUID_FRAME_H = 95;
-const DRUID_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
+const DRUID_FRAME_COUNTS = { idle: 9, walk: 16, attack: 16, hit: 9 };
 const DRUID_FRAME_DURATIONS = { idle: 0.35, walk: 0.1, attack: 0.22, hit: 0.18 };
 const DRUID_SPRITES = {
   loadAll() {
@@ -793,7 +819,7 @@ ZOMBIE_SPRITES.loadAll();
 
 
 const SORCERESS_FRAME_W = 110, SORCERESS_FRAME_H = 110;
-const SORCERESS_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
+const SORCERESS_FRAME_COUNTS = { idle: 9, walk: 16, attack: 16, hit: 9 };
 const SORCERESS_FRAME_DURATIONS = { idle: 0.3, walk: 0.12, attack: 0.18, hit: 0.12 };
 const SORCERESS_SPRITES = {
   loadAll() {
@@ -812,7 +838,7 @@ SORCERESS_SPRITES.loadAll();
 
 
 const PALADIN_FRAME_W = 329, PALADIN_FRAME_H = 300;
-const PALADIN_FRAME_COUNTS = { idle: 4, walk: 9, attack: 9, hit: 4 };
+const PALADIN_FRAME_COUNTS = { idle: 9, walk: 16, attack: 16, hit: 9 };
 const PALADIN_FRAME_DURATIONS = { idle: 0.3, walk: 0.12, attack: 0.18, hit: 0.18 };
 const PALADIN_SPRITES = {
   loadAll() {
@@ -854,7 +880,7 @@ GIANT_SPRITES.loadAll();
 // attack: 22667 → 4 frames, 1019×245 → frameW=254
 // hit:    22669 → 3 frames, 907×275  → frameW=302
 const KNIGHT_FRAME_W = 268, KNIGHT_FRAME_H = 232;
-const KNIGHT_FRAME_COUNTS    = { idle: 4, walk: 9, attack: 9, hit: 4 };
+const KNIGHT_FRAME_COUNTS    = { idle: 9, walk: 16, attack: 16, hit: 9 };
 const KNIGHT_FRAME_DURATIONS = { idle: 0.4, walk: 0.1, attack: 0.15, hit: 0.13 };
 const KNIGHT_SPRITES = {
   loadAll() {
@@ -1389,13 +1415,11 @@ const spriteCfg = SPRITE_CONFIGS[this.type];
 if (spriteCfg && spriteCfg.sprites[this.animState] && spriteCfg.sprites[this.animState].complete && spriteCfg.sprites[this.animState].naturalWidth > 0) {
   const img = spriteCfg.sprites[this.animState];
   
-  // Todos os heróis (inclusive guerreiro): spritesheet normal, cortada por frame
+  // Todos os heróis (inclusive guerreiro): corte automático (fileira ou grade)
   {
     const count = spriteCfg.counts[this.animState];
     const frame = Math.min(this.animFrame, count - 1);
-    const realFrameW = img.naturalWidth / count;
-    const realFrameH = img.naturalHeight;
-    const sx = frame * realFrameW;
+    const { sx, sy, frameW: realFrameW, frameH: realFrameH } = getFrameRect(img, count, frame);
     const drawH = this.h * 1.5;
     const drawW = realFrameW * (drawH / realFrameH);
     const drawX = this.x + this.w / 2 - drawW / 2;
@@ -1408,10 +1432,10 @@ if (spriteCfg && spriteCfg.sprites[this.animState] && spriteCfg.sprites[this.ani
       ctx.save();
       ctx.translate(drawX + drawW, drawY);
       ctx.scale(-1, 1);
-      ctx.drawImage(img, sx, 0, realFrameW, realFrameH, 0, 0, drawW, drawH);
+      ctx.drawImage(img, sx, sy, realFrameW, realFrameH, 0, 0, drawW, drawH);
       ctx.restore();
     } else {
-      ctx.drawImage(img, sx, 0, realFrameW, realFrameH, drawX, drawY, drawW, drawH);
+      ctx.drawImage(img, sx, sy, realFrameW, realFrameH, drawX, drawY, drawW, drawH);
     }
   }
 } else {
