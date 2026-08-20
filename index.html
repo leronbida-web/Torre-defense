@@ -616,7 +616,7 @@ const W = canvas.width, H = canvas.height;
 const GROUND_Y = H - 160; // linha do "chão" onde personagens ficam
 
 const BG_IMG = new Image();
-BG_IMG.src = 'https://i.imgur.com/zIc3nQr.png';
+BG_IMG.src = 'https://i.imgur.com/x2wCQoG.png';
 
 
 // Detecta automaticamente se a imagem é uma fileira única (strip) ou uma grade
@@ -686,7 +686,7 @@ ARCHER_SPRITES.loadAll();
 
 
 const ORC_FRAME_W = 236, ORC_FRAME_H = 234;
-const ORC_FRAME_COUNTS = { walk: 16, victory: 16, defeat: 16 };
+const ORC_FRAME_COUNTS = { walk: 16, victory: 5, defeat: 8 };
 const ORC_FRAME_DURATIONS = { walk: 0.1, victory: 0.28, defeat: 0.11 };
 const ORC_SPRITES = {
   loadAll() {
@@ -704,7 +704,7 @@ ORC_SPRITES.loadAll();
 
 
 const WITCH_FRAME_W = 110, WITCH_FRAME_H = 110;
-const WITCH_FRAME_COUNTS = { idle: 9, walk: 16, attack: 9, hit: 9 };
+const WITCH_FRAME_COUNTS = { idle: 9, walk: 16, attack: 16, hit: 9 };
 const WITCH_FRAME_DURATIONS = { idle: 0.3, walk: 0.09, attack: 0.25, hit: 0.12 };
 const WITCH_SPRITES = {
   loadAll() {
