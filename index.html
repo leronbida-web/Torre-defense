@@ -621,6 +621,11 @@ const GROUND_Y = H - 160; // linha do "chão" onde personagens ficam
 // pra dentro do campo, mais baixo/negativo = mais perto da parede).
 const ENEMY_GOAL_X = 188;
 
+// Até onde os heróis podem avançar no campo (metade da arena). Evita que eles
+// cheguem perto demais da borda direita, o que fazia inimigos recém-spawnados
+// ficarem "presos" fora da tela.
+const HERO_MAX_X = Math.round(W * 0.5);
+
 const BG_IMG = new Image();
 BG_IMG.src = 'https://i.imgur.com/x2wCQoG.png';
 
@@ -1280,7 +1285,7 @@ class Hero {
       const d = Math.abs(e.x - this.x);
       if (d < nearestDist) { nearestDist = d; nearestEnemy = e; }
     }
-    if (nearestEnemy === null) return Math.round(W * 0.68) - this.w; // aguarda no limite do campo inimigo
+    if (nearestEnemy === null) return HERO_MAX_X - this.w; // aguarda no meio do campo
 
     // considera a margem transparente do sprite do orc, para o herói poder
     // avançar até perto da perna visível em vez de parar na borda da hitbox
@@ -1303,7 +1308,7 @@ class Hero {
     // laneOffset vai de -25 a +25; remapeia para 0..variation (sempre dentro do alcance)
     const standoff = variation > 0 ? ((this.laneOffset + 25) / 50) * variation : 0;
     const limit = nearestX - this.w - standoff;
-    return Math.max(10, Math.min(limit, W - this.w));
+    return Math.max(10, Math.min(limit, HERO_MAX_X - this.w));
   }
 
   getRearPosition() {
@@ -3159,7 +3164,10 @@ function gameLoop(now) {
   heroes.forEach(h => h.update(dt));
   heroes = heroes.filter(h => h.alive);
   // Parede invisível do castelo: nenhum herói pode ultrapassar esse ponto
-  heroes.forEach(h => { if (h.x < ENEMY_GOAL_X) h.x = ENEMY_GOAL_X; });
+  heroes.forEach(h => {
+    if (h.x < ENEMY_GOAL_X) h.x = ENEMY_GOAL_X;
+    if (h.x > HERO_MAX_X - h.w) h.x = HERO_MAX_X - h.w;
+  });
 
   // Tríplice Sagrada: detecta e atualiza o combo Mago + Bruxa + Feiticeira
   updateTripleCombo(dt);
