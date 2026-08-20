@@ -621,10 +621,13 @@ const GROUND_Y = H - 160; // linha do "chão" onde personagens ficam
 // pra dentro do campo, mais baixo/negativo = mais perto da parede).
 const ENEMY_GOAL_X = 188;
 
-// Até onde os heróis podem avançar no campo (metade da arena). Evita que eles
-// cheguem perto demais da borda direita, o que fazia inimigos recém-spawnados
-// ficarem "presos" fora da tela.
-const HERO_MAX_X = Math.round(W * 0.5);
+// Até onde cada herói pode avançar no campo, de acordo com seu papel:
+// corpo a corpo avança mais (60%), à distância fica no meio (50%),
+// suporte fica mais atrás (40%). Zumbis invocados pela bruxa não têm limite
+// (avançam livremente até a parede do castelo, como um inimigo comum).
+const HERO_LANE_MELEE = 0.60;
+const HERO_LANE_RANGED = 0.50;
+const HERO_LANE_SUPPORT = 0.40;
 
 const BG_IMG = new Image();
 BG_IMG.src = 'https://i.imgur.com/x2wCQoG.png';
@@ -1272,6 +1275,16 @@ class Hero {
     return heroes.some(h => h !== this && h.alive);
   }
 
+  getMaxAdvanceX() {
+    // Zumbi invocado pela bruxa: sem limite de linha, avança como um inimigo comum
+    if (this.type === 'zombie') return W - this.w;
+    if (this.isSupport) return Math.round(W * HERO_LANE_SUPPORT) - this.w;
+    // à distância = alcance de ataque grande (heróis corpo a corpo ficam bem abaixo disso)
+    const isRanged = this.atkRange >= 100;
+    if (isRanged) return Math.round(W * HERO_LANE_RANGED) - this.w;
+    return Math.round(W * HERO_LANE_MELEE) - this.w; // corpo a corpo
+  }
+
   getFrontLimit() {
     // posição máxima que o herói pode avançar: dentro do seu próprio alcance
     // de ataque em relação ao inimigo vivo mais próximo, com um leve
@@ -1285,7 +1298,7 @@ class Hero {
       const d = Math.abs(e.x - this.x);
       if (d < nearestDist) { nearestDist = d; nearestEnemy = e; }
     }
-    if (nearestEnemy === null) return HERO_MAX_X - this.w + this.laneOffset; // aguarda no meio do campo, com leve espalhamento
+    if (nearestEnemy === null) return this.getMaxAdvanceX() + this.laneOffset; // aguarda na sua linha, com leve espalhamento
 
     // considera a margem transparente do sprite do orc, para o herói poder
     // avançar até perto da perna visível em vez de parar na borda da hitbox
@@ -1308,7 +1321,7 @@ class Hero {
     // laneOffset vai de -25 a +25; remapeia para 0..variation (sempre dentro do alcance)
     const standoff = variation > 0 ? ((this.laneOffset + 25) / 50) * variation : 0;
     const limit = nearestX - this.w - standoff;
-    return Math.max(10, Math.min(limit, HERO_MAX_X - this.w));
+    return Math.max(10, Math.min(limit, this.getMaxAdvanceX()));
   }
 
   getRearPosition() {
@@ -3166,7 +3179,7 @@ function gameLoop(now) {
   // Parede invisível do castelo: nenhum herói pode ultrapassar esse ponto
   heroes.forEach(h => {
     if (h.x < ENEMY_GOAL_X) h.x = ENEMY_GOAL_X;
-    const maxX = HERO_MAX_X - h.w + 25; // +25 = variação máxima do laneOffset, para não anular o espalhamento
+    const maxX = Math.min(h.getMaxAdvanceX() + 25, W - h.w); // +25 = variação máxima do laneOffset
     if (h.x > maxX) h.x = maxX;
   });
 
