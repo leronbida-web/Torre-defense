@@ -1285,7 +1285,7 @@ class Hero {
       const d = Math.abs(e.x - this.x);
       if (d < nearestDist) { nearestDist = d; nearestEnemy = e; }
     }
-    if (nearestEnemy === null) return HERO_MAX_X - this.w; // aguarda no meio do campo
+    if (nearestEnemy === null) return HERO_MAX_X - this.w + this.laneOffset; // aguarda no meio do campo, com leve espalhamento
 
     // considera a margem transparente do sprite do orc, para o herói poder
     // avançar até perto da perna visível em vez de parar na borda da hitbox
@@ -3166,7 +3166,8 @@ function gameLoop(now) {
   // Parede invisível do castelo: nenhum herói pode ultrapassar esse ponto
   heroes.forEach(h => {
     if (h.x < ENEMY_GOAL_X) h.x = ENEMY_GOAL_X;
-    if (h.x > HERO_MAX_X - h.w) h.x = HERO_MAX_X - h.w;
+    const maxX = HERO_MAX_X - h.w + 25; // +25 = variação máxima do laneOffset, para não anular o espalhamento
+    if (h.x > maxX) h.x = maxX;
   });
 
   // Tríplice Sagrada: detecta e atualiza o combo Mago + Bruxa + Feiticeira
