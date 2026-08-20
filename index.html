@@ -3158,12 +3158,17 @@ function gameLoop(now) {
   // update heróis
   heroes.forEach(h => h.update(dt));
   heroes = heroes.filter(h => h.alive);
+  // Parede invisível do castelo: nenhum herói pode ultrapassar esse ponto
+  heroes.forEach(h => { if (h.x < ENEMY_GOAL_X) h.x = ENEMY_GOAL_X; });
 
   // Tríplice Sagrada: detecta e atualiza o combo Mago + Bruxa + Feiticeira
   updateTripleCombo(dt);
 
   // update inimigos
   enemies.forEach(e => e.update(dt));
+  // Parede invisível do castelo: nenhum inimigo pode ultrapassar esse ponto
+  // (o Orc já para sozinho para tocar a animação de vitória; isso cobre os demais tipos)
+  enemies.forEach(e => { if (!e.reachedGoal && e.x < ENEMY_GOAL_X) e.x = ENEMY_GOAL_X; });
 
   // Vitória do orc: ao chegar no objetivo, toca a animação de vitória antes do Game Over
   const winner = enemies.find(e => e.alive && e.reachedGoal);
