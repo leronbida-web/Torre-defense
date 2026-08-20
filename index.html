@@ -2192,7 +2192,7 @@ class RedQueen {
     // Rainha Vermelha: 2x o tamanho de um herói comum, ataca à distância e invoca zumbis
     this.w = 38 * 2;
     this.h = 58 * 2;
-    this.x = Math.round(W * 0.68) - Math.round(this.w / 2);
+    this.x = W + this.w + 20;
     this.y = GROUND_Y - this.h;
     this.maxHp = 2500;
     this.hp = this.maxHp;
