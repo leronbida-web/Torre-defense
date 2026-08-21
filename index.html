@@ -2790,7 +2790,7 @@ function startNextWave(now) {
 
   const count = phase === 5 ? 1 : Math.min(wave, 3);
   for (let i = 0; i < count; i++) {
-    spawnQueue.push({ time: now + i * 500, type: 'enemy' });
+    spawnQueue.push({ time: now + i * 1, type: 'enemy' });
   }
   waveActive = true;
 }
