@@ -625,9 +625,9 @@ const ENEMY_GOAL_X = 188;
 // corpo a corpo avança mais (60%), à distância fica no meio (50%),
 // suporte fica mais atrás (40%). Zumbis invocados pela bruxa não têm limite
 // (avançam livremente até a parede do castelo, como um inimigo comum).
-const HERO_LANE_MELEE = 0.75;
-const HERO_LANE_RANGED = 0.65;
-const HERO_LANE_SUPPORT = 0.55;
+const HERO_LANE_MELEE = 0.60;
+const HERO_LANE_RANGED = 0.50;
+const HERO_LANE_SUPPORT = 0.40;
 
 const BG_IMG = new Image();
 BG_IMG.src = 'https://i.imgur.com/x2wCQoG.png';
@@ -1529,7 +1529,7 @@ class Enemy {
     // Fileiras alternadas: índice par = frente (rowOffset 0), ímpar = trás (rowOffset -40)
     const isBackRow = (spawnIndex || 0) % 2 === 1;
     this.rowOffsetY = isBackRow ? -40 : 0;
-    this._targetX = Math.round(W * 0.68) - Math.round(this.w / 2) + (isBackRow ? -60 : 0);
+    this._targetX = Math.round(W * HERO_LANE_MELEE) - Math.round(this.w / 2) + (isBackRow ? -60 : 0);
     this.x = W + this.w + 20;
     // yOffset negativo sobe o orc para alinhar os pés com os heróis
     this.yOffset = -30;
@@ -1594,13 +1594,9 @@ class Enemy {
         this.atkTimer = this.atkCooldown;
       }
     } else {
-      // anda lentamente para a esquerda, em direção aos heróis
+      // anda para a esquerda, em direção aos heróis, em velocidade constante
       const _orcSpd = this.getEffectiveSpeed();
-      if (this.x > (this._targetX || 0) + this.w * 0.5) {
-        this.x -= Math.max(_orcSpd, 120) * dt;
-      } else {
-        this.x -= _orcSpd * dt;
-      }
+      this.x -= _orcSpd * dt;
       if (this.x <= ENEMY_GOAL_X) {
         this.x = ENEMY_GOAL_X;
         this.reachedGoal = true;
@@ -1738,7 +1734,7 @@ class Dragon {
     this.h = 58 * 4.5;
     const _drIsBack = (spawnIndex || 0) % 2 === 1;
     this.rowOffsetY = _drIsBack ? -60 : 0;
-    this._targetX = Math.round(W * 0.68) - Math.round(this.w / 2) + (_drIsBack ? -80 : 0);
+    this._targetX = Math.round(W * HERO_LANE_MELEE) - Math.round(this.w / 2) + (_drIsBack ? -80 : 0);
     this.x = W + this.w + 20;
     this.y = 40 + this.rowOffsetY; // voando bem alto no céu, longe do chão
     this.maxHp = 500;
@@ -1789,18 +1785,10 @@ class Dragon {
           target, this.dmg, '#ff7b1a'
         ));
       }
-      // mantém alguma distância, mas continua se aproximando lentamente
-      if (this.x > (this._targetX || 0) + this.w * 0.5) {
-        this.x -= Math.max(spd, 80) * dt;
-      } else {
-        this.x -= spd * dt;
-      }
+      // mantém alguma distância, mas continua se aproximando em velocidade constante
+      this.x -= spd * dt;
     } else {
-      if (this.x > (this._targetX || 0) + this.w * 0.5) {
-        this.x -= Math.max(spd, 80) * dt;
-      } else {
-        this.x -= spd * dt;
-      }
+      this.x -= spd * dt;
     }
   }
 
@@ -1886,7 +1874,7 @@ class StoneGiant {
     this.h = 58 * 4;
     const _sgIsBack = (spawnIndex || 0) % 2 === 1;
     this.rowOffsetY = _sgIsBack ? -40 : 0;
-    this._targetX = Math.round(W * 0.68) - Math.round(this.w / 2) + (_sgIsBack ? -60 : 0);
+    this._targetX = Math.round(W * HERO_LANE_MELEE) - Math.round(this.w / 2) + (_sgIsBack ? -60 : 0);
     this.x = W + this.w + 20;
     this.y = GROUND_Y - this.h + this.rowOffsetY;
     this.maxHp = 1000;
@@ -1937,13 +1925,9 @@ class StoneGiant {
         targets.slice(0, this.maxTargets).forEach(h => h.takeDamage(this.dmg));
       }
     } else {
-      // anda lentamente para a esquerda, em direção aos heróis
+      // anda para a esquerda, em direção aos heróis, em velocidade constante
       const _sgSpd = this.getEffectiveSpeed();
-      if (this.x > (this._targetX || 0) + this.w * 0.5) {
-        this.x -= Math.max(_sgSpd, 120) * dt;
-      } else {
-        this.x -= _sgSpd * dt;
-      }
+      this.x -= _sgSpd * dt;
     }
   }
 
@@ -2414,7 +2398,7 @@ class SoulReaper {
     this.h = 65 * 3.2;
     const _srIsBack = (spawnIndex || 0) % 2 === 1;
     this.rowOffsetY = _srIsBack ? -40 : 0;
-    this._targetX = Math.round(W * 0.68) - Math.round(this.w / 2) + (_srIsBack ? -60 : 0);
+    this._targetX = Math.round(W * HERO_LANE_MELEE) - Math.round(this.w / 2) + (_srIsBack ? -60 : 0);
     this.x = W + this.w + 20;
     this.y = GROUND_Y - this.h + this.rowOffsetY;
     this.maxHp = 150;
@@ -2488,11 +2472,7 @@ class SoulReaper {
     } else {
       this.advanceAnim(dt, 'walk');
       const _srSpd = this.getEffectiveSpeed();
-      if (this.x > (this._targetX || 0) + this.w * 0.5) {
-        this.x -= Math.max(_srSpd, 120) * dt;
-      } else {
-        this.x -= _srSpd * dt;
-      }
+      this.x -= _srSpd * dt;
     }
   }
 
