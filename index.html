@@ -1031,6 +1031,9 @@ const HERO_TYPES = {
 let heroes = [];
 let enemies = [];
 let projectiles = [];
+let heroSpawnCounter = 0;    // nunca reseta (ao contrário de heroes.length, que cai quando um herói morre)
+                              // usado para alternar as fileiras de forma estável
+let supportSpawnCounter = 0; // mesma ideia, mas separado para os heróis de suporte (curandeiro, druida)
 
 class Hero {
   constructor(type, startX) {
@@ -1063,13 +1066,25 @@ class Hero {
     this.buffPulseElapsed = 0;
     this.isSupport = this.buffPct > 0 || this.healAmount > 0; // não avança para a linha de frente, fica na retaguarda
     this.age = 0;
-    this.laneOffset = (Math.random() - 0.5) * 50; // leve variação lateral para não empilhar com outros heróis
-    // Os heróis se distribuem em duas fileiras (como numa formação real):
-    // suporte sempre na fileira de trás; os demais alternam de fileira
-    // conforme a ordem de invocação, para não ficarem todos enfileirados
-    // numa única linha quando vários do mesmo tipo são colocados juntos.
-    const isBackRow = this.isSupport || (heroes.length % 2 === 1);
-    this.rowOffsetY = isBackRow ? -40 : 0;
+    this.laneOffset = (Math.random() - 0.5) * 90; // variação lateral (horizontal) mais ampla para não empilhar com outros heróis
+    // Os heróis se distribuem em várias fileiras (como numa formação real).
+    // O suporte usa a MESMA faixa vertical dos demais (para ficar misturado no
+    // meio do grupo, não isolado acima/atrás) — quem já o mantém mais recuado
+    // é o eixo X, via getMaxAdvanceX() (HERO_LANE_SUPPORT), não a fileira.
+    // heroSpawnCounter/supportSpawnCounter nunca resetam (ao contrário de
+    // heroes.length, que cai quando um herói morre e é removido do array —
+    // por isso usamos contadores em vez do tamanho do array).
+    const ROW_SPACING = 34;
+    const ROWS = 3;
+    const MIDDLE_ROW = 1; // fileira central (0=frente, 1=meio, 2=trás)
+    let rowIndex;
+    if (this.isSupport) {
+      rowIndex = MIDDLE_ROW; // suporte sempre na fileira do meio, junto dos outros heróis
+    } else {
+      rowIndex = heroSpawnCounter % ROWS;
+      heroSpawnCounter++;
+    }
+    this.rowOffsetY = -rowIndex * ROW_SPACING;
     this.y += this.rowOffsetY;
 
     // Paladina: poder único de fúria sagrada
@@ -1530,7 +1545,7 @@ class Enemy {
     const isBackRow = (spawnIndex || 0) % 2 === 1;
     this.rowOffsetY = isBackRow ? -40 : 0;
     this._targetX = Math.round(W * HERO_LANE_MELEE) - Math.round(this.w / 2) + (isBackRow ? -60 : 0);
-    this.x = W + this.w + 20;
+    this.x = W - this.w - 10;
     // yOffset negativo sobe o orc para alinhar os pés com os heróis
     this.yOffset = -30;
     this.y = GROUND_Y - this.h + this.rowOffsetY + this.yOffset;
@@ -1735,7 +1750,7 @@ class Dragon {
     const _drIsBack = (spawnIndex || 0) % 2 === 1;
     this.rowOffsetY = _drIsBack ? -60 : 0;
     this._targetX = Math.round(W * HERO_LANE_MELEE) - Math.round(this.w / 2) + (_drIsBack ? -80 : 0);
-    this.x = W + this.w + 20;
+    this.x = W - this.w - 10;
     this.y = 40 + this.rowOffsetY; // voando bem alto no céu, longe do chão
     this.maxHp = 500;
     this.hp = this.maxHp;
@@ -1875,7 +1890,7 @@ class StoneGiant {
     const _sgIsBack = (spawnIndex || 0) % 2 === 1;
     this.rowOffsetY = _sgIsBack ? -40 : 0;
     this._targetX = Math.round(W * HERO_LANE_MELEE) - Math.round(this.w / 2) + (_sgIsBack ? -60 : 0);
-    this.x = W + this.w + 20;
+    this.x = W - this.w - 10;
     this.y = GROUND_Y - this.h + this.rowOffsetY;
     this.maxHp = 1000;
     this.hp = this.maxHp;
@@ -2176,7 +2191,7 @@ class RedQueen {
     // Rainha Vermelha: 2x o tamanho de um herói comum, ataca à distância e invoca zumbis
     this.w = 38 * 2;
     this.h = 58 * 2;
-    this.x = W + this.w + 20;
+    this.x = W - this.w - 10;
     this.y = GROUND_Y - this.h;
     this.maxHp = 2500;
     this.hp = this.maxHp;
@@ -2399,7 +2414,7 @@ class SoulReaper {
     const _srIsBack = (spawnIndex || 0) % 2 === 1;
     this.rowOffsetY = _srIsBack ? -40 : 0;
     this._targetX = Math.round(W * HERO_LANE_MELEE) - Math.round(this.w / 2) + (_srIsBack ? -60 : 0);
-    this.x = W + this.w + 20;
+    this.x = W - this.w - 10;
     this.y = GROUND_Y - this.h + this.rowOffsetY;
     this.maxHp = 150;
     this.hp = this.maxHp;
@@ -2801,7 +2816,7 @@ function spawnEnemyForPhase() {
 
   // Fase 1, Ondas 1 e 3: spawna ZombieEnemy
   if (phase === 1 && (wave === 1 || wave === 3)) {
-    const z = new ZombieEnemy(W + 20, enemyIndex);
+    const z = new ZombieEnemy(W - 30, enemyIndex);
     z.speed = 55;
     enemies.push(z);
     return;
@@ -3198,7 +3213,7 @@ function gameLoop(now) {
   while (spawnQueue.length > 0 && now >= spawnQueue[0].time) {
     const entry = spawnQueue.shift();
     if (entry.type === 'zombie') {
-      const z = new ZombieEnemy(W + 20, enemies.length);
+      const z = new ZombieEnemy(W - 30, enemies.length);
       z.speed = 55;
       enemies.push(z);
     } else {
@@ -3239,7 +3254,7 @@ function gameLoop(now) {
   const phase1CustomControl = phase === 1 && wave < 3;
   if (!anyAlive && spawnQueue.length === 0 && !phase1CustomControl) {
     if (enemyDeadSince === null) enemyDeadSince = now;
-    if (now - enemyDeadSince > 2000) {
+    if (now - enemyDeadSince > 500) {
       enemies = [];
       if (wave >= 3) {
         phase++;
