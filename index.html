@@ -2772,69 +2772,87 @@ function resetTripleComboForNewPhase() {
   tripleComboUsedInPhase = false;
 }
 
-// ---------- Estado customizado da Fase 1 ----------
-// A fase 1 tem lógica própria de gatilhos, separada do sistema genérico de ondas.
-// onda 1: 6 zumbis, 1s de intervalo
-// onda 2: 1 orc, nasce quando o último zumbi morrer
-// onda 3: 6 zumbis, 1s de intervalo, nascem quando o orc tiver <= 100 HP
-let phase1OrcRef = null;       // referência ao orc da onda 2
-let phase1Wave2Triggered = false; // orc já foi agendado?
-let phase1Wave3Triggered = false; // onda 3 de zumbis já foi agendada?
+// ---------- Estado customizado de ondas por fase ----------
+// Cada fase tem sua própria sequência de ondas, disparadas por gatilhos
+// (morte de todos os inimigos da onda anterior, ou HP de um inimigo-chave
+// caindo abaixo de um limiar), em vez do sistema genérico antigo.
+//
+// Fase 1: onda1 = 6 zumbis (1/s) | onda2 = 1 orc (nasce ao fim da onda1)
+//         onda3 = 2 orcs + 6 zumbis (nasce quando o orc da onda2 <= 100 HP)
+// Fase 2: onda1 = 6 zumbis + 1 gárgula sobrevoando
+//         onda2 = 2 orcs + 1 gárgula sobrevoando (nasce quando a gárgula da onda1 <= 100 HP)
+//         onda3 = 6 zumbis (nasce quando a gárgula da onda2 <= 100 HP)
+// Fase 3: onda1 = 1 gigante de pedra | onda2 = 2 orcs + 1 gigante + 1 gárgula, entrando em sequência
+// Fase 4: onda1 = 6 zumbis + 1 gárgula | onda2 = 1 ceifador de almas
+//         onda3 = 1 ceifador + 1 orc + 1 gigante + 1 gárgula
+// Fase 5: onda1 = 1 Rainha Vermelha | onda2 = 6 zumbis + 1 ceifador + 1 orc + 1 gigante
+//         + 1 gárgula + 1 nova rainha — combate final: quando tudo morre, a leva renasce (infinito)
+const PHASE_FINAL_WAVE = { 1: 3, 2: 3, 3: 2, 4: 3, 5: 2 };
 
-function resetPhase1State() {
-  phase1OrcRef = null;
-  phase1Wave2Triggered = false;
-  phase1Wave3Triggered = false;
+let p1Wave2Triggered = false;
+let p1Wave3Triggered = false;
+let p2Wave2Triggered = false;
+let p2Wave3Triggered = false;
+let p3Wave2Triggered = false;
+let p4Wave2Triggered = false;
+let p4Wave3Triggered = false;
+let p5Wave2Triggered = false; // primeira entrada na onda-final infinita da fase 5
+
+function resetPhaseWaveState() {
+  p1Wave2Triggered = false;
+  p1Wave3Triggered = false;
+  p2Wave2Triggered = false;
+  p2Wave3Triggered = false;
+  p3Wave2Triggered = false;
+  p4Wave2Triggered = false;
+  p4Wave3Triggered = false;
+  p5Wave2Triggered = false;
+}
+// Mantido por compatibilidade com chamadas existentes no código.
+function resetPhase1State() { resetPhaseWaveState(); }
+
+// Cria um inimigo de um tipo explícito e o adiciona ao array `enemies`.
+function spawnEnemyOfType(type) {
+  const idx = enemies.filter(e => e.alive).length; // alterna fileira frente/trás
+  let e;
+  switch (type) {
+    case 'zombie': {
+      e = new ZombieEnemy(W - 30, idx);
+      e.speed = 55;
+      break;
+    }
+    case 'orc': e = new Enemy(idx); break;
+    case 'gargoyle': e = new Dragon(idx); break;
+    case 'stonegiant': e = new StoneGiant(idx); break;
+    case 'soulreaper': e = new SoulReaper(idx); break;
+    case 'redqueen': e = new RedQueen(); break;
+    default: e = new Enemy(idx);
+  }
+  enemies.push(e);
+  return e;
 }
 
+// Agenda a composição inicial (onda 1) de cada fase. As ondas seguintes de
+// cada fase nascem via gatilhos customizados dentro do game loop.
 function startNextWave(now) {
   wave++;
   spawnQueue = [];
 
-  // Fase 1: onda 1 agenda 6 zumbis com tipo explícito
-  if (phase === 1) {
-    if (wave === 1) {
-      for (let i = 0; i < 6; i++) {
-        spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
-      }
-    }
-    // ondas 2 e 3 são disparadas por gatilho no game loop
-    waveActive = true;
-    return;
+  if (phase === 1 && wave === 1) {
+    for (let i = 0; i < 6; i++) spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
+  } else if (phase === 2 && wave === 1) {
+    for (let i = 0; i < 6; i++) spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
+    spawnQueue.push({ time: now, type: 'gargoyle' }); // sobrevoa os zumbis
+  } else if (phase === 3 && wave === 1) {
+    spawnQueue.push({ time: now, type: 'stonegiant' });
+  } else if (phase === 4 && wave === 1) {
+    for (let i = 0; i < 6; i++) spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
+    spawnQueue.push({ time: now, type: 'gargoyle' }); // sobrevoa os zumbis
+  } else if (phase === 5 && wave === 1) {
+    spawnQueue.push({ time: now, type: 'redqueen' });
   }
 
-  const count = phase === 5 ? 1 : Math.min(wave, 3);
-  for (let i = 0; i < count; i++) {
-    spawnQueue.push({ time: now + i * -1, type: 'enemy' });
-  }
   waveActive = true;
-}
-
-function spawnEnemyForPhase() {
-  // Conta quantos inimigos já existem para alternar a fileira
-  const enemyIndex = enemies.filter(e => e.alive).length;
-
-  // Fase 1, Ondas 1 e 3: spawna ZombieEnemy
-  if (phase === 1 && (wave === 1 || wave === 3)) {
-    const z = new ZombieEnemy(W - 30, enemyIndex);
-    z.speed = 55;
-    enemies.push(z);
-    return;
-  }
-
-  if (phase === 1) {
-    enemies.push(new Enemy(enemyIndex));
-  } else if (phase === 2) {
-    enemies.push(new Dragon(enemyIndex));
-  } else if (phase === 3) {
-    enemies.push(new StoneGiant(enemyIndex));
-  } else if (phase === 4) {
-    enemies.push(new SoulReaper(enemyIndex));
-  } else if (phase === 5) {
-    enemies.push(new RedQueen());
-  } else {
-    enemies.push(new RedQueen());
-  }
 }
 
 // Chamada no início
@@ -3209,64 +3227,146 @@ function gameLoop(now) {
   }
 
   // ---------- Lógica de ondas ----------
-  // Spawna inimigos agendados — spawnQueue agora armazena { time, type } para fase 1
+  // Spawna inimigos agendados — spawnQueue armazena { time, type }
   while (spawnQueue.length > 0 && now >= spawnQueue[0].time) {
     const entry = spawnQueue.shift();
-    if (entry.type === 'zombie') {
-      const z = new ZombieEnemy(W - 30, enemies.length);
-      z.speed = 55;
-      enemies.push(z);
-    } else {
-      spawnEnemyForPhase();
-    }
+    spawnEnemyOfType(entry.type);
   }
 
-  // Gatilhos customizados da Fase 1
+  // Gatilhos customizados de progressão de onda dentro de cada fase
   if (phase === 1) {
-    // Onda 2: orc nasce quando todos os zumbis da onda 1 morrerem (e fila esvaziou)
-    if (wave === 1 && !phase1Wave2Triggered && spawnQueue.length === 0) {
+    // Onda 2: 1 orc nasce quando todos os zumbis da onda 1 morrerem
+    if (wave === 1 && !p1Wave2Triggered && spawnQueue.length === 0) {
       const anyZombieAlive = enemies.some(e => e instanceof ZombieEnemy && e.alive);
       if (!anyZombieAlive) {
-        phase1Wave2Triggered = true;
+        p1Wave2Triggered = true;
         wave = 2;
         enemyDeadSince = null;
-        const orc = new Enemy(0);
-        enemies.push(orc);
-        phase1OrcRef = orc;
+        spawnQueue.push({ time: now, type: 'orc' });
       }
     }
-
-    // Onda 3: 6 zumbis nascem quando o orc atingir <= 100 HP
-    if (wave === 2 && !phase1Wave3Triggered && phase1OrcRef && phase1OrcRef.alive) {
-      if (phase1OrcRef.hp <= 100) {
-        phase1Wave3Triggered = true;
+    // Onda 3: 2 orcs + 6 zumbis nascem quando o orc da onda 2 atingir <= 100 HP
+    if (wave === 2 && !p1Wave3Triggered) {
+      const orc = enemies.find(e => e instanceof Enemy && e.alive);
+      if (orc && orc.hp <= 100) {
+        p1Wave3Triggered = true;
         wave = 3;
-        for (let i = 0; i < 6; i++) {
-          spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
-        }
+        spawnQueue.push({ time: now, type: 'orc' });
+        spawnQueue.push({ time: now + 300, type: 'orc' });
+        for (let i = 0; i < 6; i++) spawnQueue.push({ time: now + 600 + i * 1000, type: 'zombie' });
+      }
+    }
+  } else if (phase === 2) {
+    // Onda 2: 2 orcs + 1 nova gárgula (sobrevoando os orcs) quando a gárgula da onda 1 <= 100 HP
+    if (wave === 1 && !p2Wave2Triggered) {
+      const g = enemies.find(e => e instanceof Dragon && e.alive);
+      if (g && g.hp <= 100) {
+        p2Wave2Triggered = true;
+        wave = 2;
+        spawnQueue.push({ time: now, type: 'orc' });
+        spawnQueue.push({ time: now + 300, type: 'orc' });
+        spawnQueue.push({ time: now + 300, type: 'gargoyle' });
+      }
+    }
+    // Onda 3: 6 zumbis quando a gárgula da onda 2 <= 100 HP
+    if (wave === 2 && !p2Wave3Triggered) {
+      const g = enemies.find(e => e instanceof Dragon && e.alive);
+      if (g && g.hp <= 100) {
+        p2Wave3Triggered = true;
+        wave = 3;
+        for (let i = 0; i < 6; i++) spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
+      }
+    }
+  } else if (phase === 3) {
+    // Onda 2: 2 orcs + 1 gigante de pedra + 1 gárgula, entrando em sequência,
+    // quando o gigante da onda 1 morrer
+    if (wave === 1 && !p3Wave2Triggered && spawnQueue.length === 0) {
+      const giantAlive = enemies.some(e => e instanceof StoneGiant && e.alive);
+      if (!giantAlive) {
+        p3Wave2Triggered = true;
+        wave = 2;
+        enemyDeadSince = null;
+        spawnQueue.push({ time: now, type: 'orc' });
+        spawnQueue.push({ time: now + 1200, type: 'orc' });
+        spawnQueue.push({ time: now + 2400, type: 'stonegiant' });
+        spawnQueue.push({ time: now + 3600, type: 'gargoyle' });
+      }
+    }
+  } else if (phase === 4) {
+    // Onda 2: 1 ceifador de almas quando a onda 1 (zumbis + gárgula) for eliminada
+    if (wave === 1 && !p4Wave2Triggered && spawnQueue.length === 0) {
+      const anyAliveWave1 = enemies.some(e => e.alive);
+      if (!anyAliveWave1) {
+        p4Wave2Triggered = true;
+        wave = 2;
+        enemyDeadSince = null;
+        spawnQueue.push({ time: now, type: 'soulreaper' });
+      }
+    }
+    // Onda 3: 1 ceifador + 1 orc + 1 gigante + 1 gárgula quando o ceifador da onda 2 morrer
+    if (wave === 2 && !p4Wave3Triggered && spawnQueue.length === 0) {
+      const reaperAlive = enemies.some(e => e instanceof SoulReaper && e.alive);
+      if (!reaperAlive) {
+        p4Wave3Triggered = true;
+        wave = 3;
+        enemyDeadSince = null;
+        spawnQueue.push({ time: now, type: 'soulreaper' });
+        spawnQueue.push({ time: now + 800, type: 'orc' });
+        spawnQueue.push({ time: now + 1600, type: 'stonegiant' });
+        spawnQueue.push({ time: now + 2400, type: 'gargoyle' });
+      }
+    }
+  } else if (phase === 5) {
+    // Onda 2 (combate final): 6 zumbis + 1 ceifador + 1 orc + 1 gigante + 1 gárgula
+    // + 1 nova rainha, quando a Rainha da onda 1 morrer. Ao ser totalmente eliminada,
+    // a mesma leva renasce — a onda final é um combate infinito.
+    if (wave === 1 && !p5Wave2Triggered && spawnQueue.length === 0) {
+      const queenAlive = enemies.some(e => e instanceof RedQueen && e.alive);
+      if (!queenAlive) {
+        p5Wave2Triggered = true;
+        wave = 2;
+        enemyDeadSince = null;
+        for (let i = 0; i < 6; i++) spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
+        spawnQueue.push({ time: now + 5500, type: 'soulreaper' });
+        spawnQueue.push({ time: now + 6300, type: 'orc' });
+        spawnQueue.push({ time: now + 7100, type: 'stonegiant' });
+        spawnQueue.push({ time: now + 7900, type: 'gargoyle' });
+        spawnQueue.push({ time: now + 8700, type: 'redqueen' });
+      }
+    } else if (wave === 2 && spawnQueue.length === 0) {
+      const anyAliveWave2 = enemies.some(e => e.alive);
+      if (!anyAliveWave2) {
+        for (let i = 0; i < 6; i++) spawnQueue.push({ time: now + i * 1000, type: 'zombie' });
+        spawnQueue.push({ time: now + 5500, type: 'soulreaper' });
+        spawnQueue.push({ time: now + 6300, type: 'orc' });
+        spawnQueue.push({ time: now + 7100, type: 'stonegiant' });
+        spawnQueue.push({ time: now + 7900, type: 'gargoyle' });
+        spawnQueue.push({ time: now + 8700, type: 'redqueen' });
       }
     }
   }
 
-  // Quando todos morreram e fila esvaziou, iniciar próxima onda (ou próxima fase) após 2s
-  // Na Fase 1 as ondas são controladas pelos gatilhos acima; o sistema genérico só age quando wave === 3 (após onda 3 de zumbis)
+  // Quando todos morreram e a fila esvaziou, avança para a próxima onda/fase após 500ms.
+  // A progressão dentro de cada fase é controlada pelos gatilhos customizados acima;
+  // o sistema genérico só age quando a fase atinge sua onda final (ou, na fase 5,
+  // nunca — a onda 2 dessa fase é um combate infinito controlado só pelo gatilho acima).
   const anyAlive = enemies.some(e => e.alive);
-  const phase1CustomControl = phase === 1 && wave < 3;
-  if (!anyAlive && spawnQueue.length === 0 && !phase1CustomControl) {
+  const customControl = phase === 5 ? wave >= 2 : wave < PHASE_FINAL_WAVE[phase];
+  if (!anyAlive && spawnQueue.length === 0 && !customControl) {
     if (enemyDeadSince === null) enemyDeadSince = now;
     if (now - enemyDeadSince > 500) {
       enemies = [];
-      if (wave >= 3) {
+      if (wave >= PHASE_FINAL_WAVE[phase]) {
         phase++;
         wave = 0;
         showPhaseBanner(phase);
         resetTripleComboForNewPhase();
-        if (phase === 2) resetPhase1State(); // limpa flags da fase 1 ao sair dela
+        resetPhaseWaveState(); // limpa gatilhos ao entrar em uma nova fase
       }
       startNextWave(now);
       enemyDeadSince = null;
     }
-  } else if (phase1CustomControl) {
+  } else if (customControl) {
     enemyDeadSince = null;
   } else {
     enemyDeadSince = null;
